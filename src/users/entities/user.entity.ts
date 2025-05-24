@@ -42,6 +42,10 @@ export class User {
   dob: string;
 
   @IsBoolean()
+  @Prop({ default: false })
+  isVerified: boolean;
+
+  @IsBoolean()
   @Prop({ default: true })
   isActive: boolean;
 
