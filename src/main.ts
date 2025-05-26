@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
 import * as cookieParser from 'cookie-parser';
 
@@ -23,6 +23,12 @@ async function bootstrap() {
   app.enableCors({
     origin: process.env.FRONTEND_URL || 'http://localhost:3000',
     credentials: true,
+  });
+
+  // Request logging to help debug auth issues
+  app.use((req, res, next) => {
+    Logger.log(`${req.method} ${req.url}`, 'Request');
+    next();
   });
 
   await app.listen(process.env.PORT ?? 3000);

@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Response } from 'express';
 import { UsersService } from '../users/users.service';
 import { CreateUserDto } from '../users/dto/create-user.dto';
+import { UserDocument } from '../users/entities/user.entity';
 
 @Injectable()
 export class AuthService {
@@ -33,7 +34,7 @@ export class AuthService {
   async login(user: any, response: Response) {
     const payload = {
       email: user.email,
-      sub: user._id,
+      sub: user._id ? user._id.toString() : user.id?.toString(), // Handle both _id and id formats
       role: user.role,
     };
 
@@ -44,6 +45,7 @@ export class AuthService {
     return {
       message: 'Login successful',
       user: {
+        id: user._id,
         email: user.email,
         fullName: user.fullName,
         phone: user.phone || null,
@@ -56,10 +58,10 @@ export class AuthService {
   }
 
   async register(createUserDto: CreateUserDto, response: Response) {
-    const user = await this.usersService.create(createUserDto);
+    const user = await this.usersService.create(createUserDto) as UserDocument;
     const payload = {
       email: user.email,
-      sub: user._id,
+      sub: user._id ? user._id.toString() : user.id?.toString(),
       role: user.role,
     };
 
