@@ -1,5 +1,6 @@
 export interface SuccessResponse<T = any> {
   success: true;
+  code?: number;
   data: T;
   message: string;
 }
@@ -7,16 +8,18 @@ export interface SuccessResponse<T = any> {
 export interface ErrorResponse {
   success: false;
   message: string;
-  errorCode?: string;
+  errorCode?: number;
   errors?: any;
 }
 
 export function successResponse<T = any>(
   data: T,
   message = 'Success',
+  code?: number,
 ): SuccessResponse<T> {
   return {
     success: true,
+    code,
     data,
     message,
   };
@@ -24,7 +27,7 @@ export function successResponse<T = any>(
 
 export function errorResponse(
   message = 'There was an error',
-  errorCode?: string,
+  errorCode?: number,
   errors?: any,
 ): ErrorResponse {
   return {
