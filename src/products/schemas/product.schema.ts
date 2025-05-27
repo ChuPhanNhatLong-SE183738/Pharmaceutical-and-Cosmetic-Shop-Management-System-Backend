@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { IsDate, IsDateString, IsNotEmpty } from 'class-validator';
-import { Document } from 'mongoose';
+import { Document, Schema as MongooseSchema } from 'mongoose';
+import { Category } from '../../categories/entities/category.entity';
 
 export enum SuitableForType {
   ALL_SKIN_TYPES = 'All skin types',
@@ -13,7 +14,7 @@ export enum SuitableForType {
 
 export type ProductDocument = Product & Document;
 
-@Schema()
+@Schema({ timestamps: true })
 export class Product {
   @IsNotEmpty()
   @Prop({ required: true })
@@ -31,8 +32,11 @@ export class Product {
   stock: number;
 
   @IsNotEmpty()
-  @Prop({ required: true })
-  category: string[];
+  @Prop({ 
+    type: [{ type: MongooseSchema.Types.ObjectId, ref: 'Category' }],
+    required: true 
+  })
+  category: Category[] | string[];
 
   @IsNotEmpty()
   @Prop({ required: true })
@@ -57,20 +61,12 @@ export class Product {
   @Prop({ type: [String], default: [] })
   reviews: string[];
 
-  @Prop({ type: String, default: null })
-  promotionId: string;
+  @Prop({ type: Number, default: null })
+  salePercentage: number | null;
 
   @IsDateString()
   @Prop({ required: true })
   expiryDate: Date;
-  
-  @IsDateString()
-  @Prop({ default: Date.now })
-  createdAt: Date;
-
-  @IsDateString()
-  @Prop({ default: Date.now })
-  updatedAt: Date;
 }
 
 export const ProductSchema = SchemaFactory.createForClass(Product);
