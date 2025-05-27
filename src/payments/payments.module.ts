@@ -4,7 +4,8 @@ import { ignoreLogger } from 'vnpay';
 import { PaymentsService } from './payments.service';
 import { PaymentsController } from './payments.controller';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TransactionsModule } from '../transactions/transactions.module';
+import { TransactionsModule } from 'src/transactions/transactions.module';
+import { CartModule } from '../cart/cart.module';
 
 @Module({
     imports: [
@@ -21,6 +22,7 @@ import { TransactionsModule } from '../transactions/transactions.module';
             inject: [ConfigService],
         }),
         TransactionsModule,
+        CartModule,
     ],
     controllers: [PaymentsController],
     providers: [PaymentsService],

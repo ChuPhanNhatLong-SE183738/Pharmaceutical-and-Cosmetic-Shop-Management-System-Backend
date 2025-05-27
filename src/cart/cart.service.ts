@@ -24,16 +24,17 @@ export class CartService {
     return this.cartModel.find().populate('items.product').exec();
   }
 
-  async findOne(id: string): Promise<CartDocument> {
-    const cart = await this.cartModel.findById(id)
-      .populate('items.product')
-      .exec();
-      
-    if (!cart) {
-      throw new NotFoundException(`Cart with ID ${id} not found`);
+  // Update the return type to allow for null
+  async findOne(id: string): Promise<CartDocument | null> {
+    try {
+      this.logger.debug(`Finding cart by id: ${id}`);
+      const cart = await this.cartModel.findById(id).exec();
+      this.logger.debug(`Found cart: ${JSON.stringify(cart)}`);
+      return cart;
+    } catch (error) {
+      this.logger.error(`Error finding cart: ${error.message}`);
+      throw error;
     }
-    
-    return cart;
   }
 
   async findByUserId(userId: Types.ObjectId): Promise<CartDocument | null> {

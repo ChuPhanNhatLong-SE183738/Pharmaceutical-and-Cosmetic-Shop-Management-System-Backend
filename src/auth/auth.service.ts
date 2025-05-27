@@ -38,6 +38,7 @@ export class AuthService {
     const payload = {
       email: user.email,
       sub: user._id ? user._id.toString() : user.id?.toString(), // Handle both _id and id formats
+      userId: user._id, // Add userId for convenience
       role: user.role,
     };
 
@@ -75,6 +76,7 @@ export class AuthService {
     const payload = {
       email: user.email,
       sub: user._id ? user._id.toString() : user.id?.toString(),
+      userId: user._id, // Add userId for convenience
       role: user.role,
     };
 

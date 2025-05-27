@@ -20,9 +20,9 @@ class CartDto {
   @IsString()
   _id: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  userId: string;
+  userId?: string;  // Make userId optional since we'll get it from JWT
 
   @IsArray()
   @ValidateNested({ each: true })
