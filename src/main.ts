@@ -5,7 +5,10 @@ import { AppModule } from './app.module';
 import * as cookieParser from 'cookie-parser';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const logger = new Logger('Bootstrap');
+  const app = await NestFactory.create(AppModule, {
+    logger: ['error', 'warn', 'debug', 'log', 'verbose'],
+  });
 
   // Swagger setup
   const config = new DocumentBuilder()
@@ -18,7 +21,11 @@ async function bootstrap() {
   SwaggerModule.setup('api', app, document);
 
   app.use(cookieParser());
-  app.useGlobalPipes(new ValidationPipe());
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+    }),
+  );
   
   app.enableCors({
     origin: process.env.FRONTEND_URL || 'http://localhost:3000',
@@ -31,6 +38,13 @@ async function bootstrap() {
     next();
   });
 
-  await app.listen(process.env.PORT ?? 3000);
+  const port = process.env.PORT || 3000;
+  await app.listen(port);
+  logger.log(`Application is running on: ${await app.getUrl()}`);
+  logger.debug(`Environment variables: 
+    VNPAY_TMN_CODE: ${process.env.VNPAY_TMN_CODE?.substring(0, 3)}...
+    VNPAY_RETURN_URL: ${process.env.VNPAY_RETURN_URL}
+    VNPAY_URL: ${process.env.VNPAY_URL}
+  `);
 }
 bootstrap();
