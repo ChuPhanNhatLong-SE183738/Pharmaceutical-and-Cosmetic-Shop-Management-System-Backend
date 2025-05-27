@@ -21,6 +21,8 @@ import { InventoryLogsModule } from './inventory_logs/inventory_logs.module';
     CartModule,
     OrdersModule,
     CategoriesModule,
+    PaymentsModule,
+    TransactionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
