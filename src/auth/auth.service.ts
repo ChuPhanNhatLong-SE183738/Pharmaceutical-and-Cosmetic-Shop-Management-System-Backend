@@ -4,12 +4,15 @@ import { Response } from 'express';
 import { UsersService } from '../users/users.service';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { UserDocument } from '../users/entities/user.entity';
+import { CartService } from '../cart/cart.service'; // Import CartService
+import { Types } from 'mongoose';
 
 @Injectable()
 export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
+    private cartService: CartService, // Inject CartService
   ) {}
 
   async validateUser(email: string, password: string) {
@@ -35,6 +38,7 @@ export class AuthService {
     const payload = {
       email: user.email,
       sub: user._id ? user._id.toString() : user.id?.toString(), // Handle both _id and id formats
+      userId: user._id, // Add userId for convenience
       role: user.role,
     };
 
@@ -58,10 +62,21 @@ export class AuthService {
   }
 
   async register(createUserDto: CreateUserDto, response: Response) {
+    // Create the user
     const user = await this.usersService.create(createUserDto) as UserDocument;
+    
+    // Create an empty cart for the new user
+    // Cast the user object to any to bypass TypeScript's type checking for _id
+    await this.cartService.create({
+      userId: new Types.ObjectId((user as any)._id.toString()),
+      items: [],
+      totalPrice: 0
+    });
+    
     const payload = {
       email: user.email,
       sub: user._id ? user._id.toString() : user.id?.toString(),
+      userId: user._id, // Add userId for convenience
       role: user.role,
     };
 

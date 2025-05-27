@@ -1,37 +1,32 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Schema as MongooseSchema, Types } from 'mongoose';
+import { Document, Types, Schema as MongooseSchema } from 'mongoose';
+import { IsNotEmpty, IsNumber, Min } from 'class-validator';
 
-// Update CartItem interface to be more flexible with ObjectId types
-export interface CartItem {
-  // Accept either type of ObjectId
+export type CartDocument = Cart & Document;
+
+class CartItem {
+  @Prop({ type: Types.ObjectId, ref: 'Product', required: true })
   productId: Types.ObjectId | MongooseSchema.Types.ObjectId;
-  quantity: number;
+
+  @Prop({ required: true })
   price: number;
+
+  @IsNumber()
+  @IsNotEmpty()
+  @Min(1)
+  @Prop({ required: true, min: 1 })
+  quantity: number;
 }
 
-// Define a type for the Cart document that includes all properties
-export type CartDocument = Document & {
-  userId: Types.ObjectId | MongooseSchema.Types.ObjectId;
-  items: CartItem[];
-  totalPrice: number;
-};
-
-@Schema()
+@Schema({ timestamps: true })
 export class Cart {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', unique: true })
-  userId: MongooseSchema.Types.ObjectId;
-  
-  @Prop({ 
-    type: [{
-      productId: { type: MongooseSchema.Types.ObjectId, ref: 'Product' },
-      quantity: { type: Number, default: 1 },
-      price: { type: Number, required: true }
-    }],
-    default: []
-  })
+  @Prop({ type: Types.ObjectId, required: true, index: true })
+  userId: Types.ObjectId;
+
+  @Prop({ type: [CartItem], default: [] })
   items: CartItem[];
-  
-  @Prop({ default: 0 })
+
+  @Prop({ type: Number, default: 0 })
   totalPrice: number;
 }
 

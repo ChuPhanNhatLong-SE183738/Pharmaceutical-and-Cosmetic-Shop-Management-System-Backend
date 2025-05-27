@@ -6,47 +6,29 @@ import { ApiBearerAuth, ApiTags, ApiOperation, ApiParam, ApiResponse } from '@ne
 import { Types } from 'mongoose';
 import { successResponse, errorResponse } from '../helper/response.helper';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../users/enums/role.enum';
+import { ProductsService } from '../products/products.service';
 
 @ApiTags('cart')
 @Controller('cart')
 export class CartController {
   private readonly logger = new Logger(CartController.name);
 
-  constructor(private readonly cartService: CartService) {}
+  constructor(
+    private readonly cartService: CartService,
+    private readonly productsService: ProductsService // Inject ProductsService
+  ) {}
 
-  @Post()
-  @ApiOperation({ summary: 'Create a new cart' })
-  @ApiResponse({ status: HttpStatus.CREATED, description: 'Cart created successfully' })
-  async create(@Body() createCartDto: CreateCartDto) {
-    try {
-      const cart = await this.cartService.create(createCartDto);
-      return successResponse(cart, 'Cart created successfully', HttpStatus.CREATED);
-    } catch (error) {
-      return errorResponse(error.message, HttpStatus.BAD_REQUEST, error);
-    }
-  }
-
-  @Get()
-  @ApiOperation({ summary: 'Get all carts (admin)' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'All carts retrieved successfully' })
-  async findAll() {
-    try {
-      const carts = await this.cartService.findAll();
-      return successResponse(carts, 'All carts retrieved successfully');
-    } catch (error) {
-      return errorResponse(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-  }
-
+  // Customer endpoints for their own cart - SPECIFIC ROUTES FIRST
   @Get('test-auth')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Test authentication' })
   async testAuth(@Request() req) {
     try {
-      // Print out the entire request user object for debugging
       console.log('Request user object:', req.user);
-      
       return successResponse({
         message: 'Authentication successful',
         user: req.user,
@@ -67,34 +49,19 @@ export class CartController {
   async getMyCart(@Request() req) {
     try {
       this.logger.log('Getting cart for authenticated user');
-      this.logger.log(`Request user object: ${JSON.stringify(req.user)}`);
       
       if (!req.user) {
-        this.logger.warn('No user object found in request');
         throw new UnauthorizedException('User not authenticated');
       }
 
-      // Extract user ID from any of the possible fields
       const userId = req.user._id || req.user.id || req.user.sub;
       
       if (!userId) {
-        this.logger.warn(`No user ID found in user object: ${JSON.stringify(req.user)}`);
         throw new UnauthorizedException('User ID not found in token');
       }
 
-      this.logger.log(`Looking for cart with userId: ${userId}`);
-      
-      // Ensure userId is converted to ObjectId
-      let userObjectId;
-      try {
-        userObjectId = new Types.ObjectId(userId.toString());
-      } catch (error) {
-        this.logger.error(`Invalid ObjectId: ${userId}`);
-        throw new BadRequestException('Invalid user ID format');
-      }
-      
+      const userObjectId = new Types.ObjectId(userId.toString());
       const cart = await this.cartService.findByUserId(userObjectId);
-      this.logger.log(`Cart found: ${cart ? 'Yes' : 'No'}`);
       
       if (!cart) {
         return successResponse(null, 'User has no cart yet');
@@ -109,26 +76,9 @@ export class CartController {
     }
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get cart by ID' })
-  @ApiParam({ name: 'id', description: 'Cart ID' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Cart retrieved successfully' })
-  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Cart not found' })
-  async findOne(@Param('id') id: string) {
-    try {
-      const cart = await this.cartService.findOne(id);
-      return successResponse(cart, 'Cart retrieved successfully');
-    } catch (error) {
-      if (error instanceof HttpException) {
-        return errorResponse(error.message, error.getStatus());
-      }
-      return errorResponse(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-  }
-
   @Post('add-item')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Add an item to cart' })
+  @ApiOperation({ summary: 'Add an item to current user cart' })
   @ApiBearerAuth()
   @ApiResponse({ status: HttpStatus.OK, description: 'Item added to cart successfully' })
   async addToCart(@Request() req, @Body() addToCartDto: AddToCartDto) {
@@ -137,7 +87,6 @@ export class CartController {
         throw new UnauthorizedException('User not authenticated');
       }
       
-      // Extract user ID from any of the possible fields
       const userId = req.user._id || req.user.id || req.user.sub;
       
       if (!userId) {
@@ -158,7 +107,7 @@ export class CartController {
 
   @Delete('remove-item/:productId')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Remove an item from cart' })
+  @ApiOperation({ summary: 'Remove an item from current user cart' })
   @ApiParam({ name: 'productId', description: 'Product ID to remove' })
   @ApiBearerAuth()
   @ApiResponse({ status: HttpStatus.OK, description: 'Item removed from cart successfully' })
@@ -168,7 +117,6 @@ export class CartController {
         throw new UnauthorizedException('User not authenticated');
       }
       
-      // Extract user ID from any of the possible fields
       const userId = req.user._id || req.user.id || req.user.sub;
       
       if (!userId) {
@@ -188,7 +136,7 @@ export class CartController {
 
   @Delete('clear')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Clear the user cart' })
+  @ApiOperation({ summary: 'Clear the current user cart' })
   @ApiBearerAuth()
   @ApiResponse({ status: HttpStatus.OK, description: 'Cart cleared successfully' })
   async clearCart(@Request() req) {
@@ -197,7 +145,6 @@ export class CartController {
         throw new UnauthorizedException('User not authenticated');
       }
       
-      // Extract user ID from any of the possible fields
       const userId = req.user._id || req.user.id || req.user.sub;
       
       if (!userId) {
@@ -215,8 +162,62 @@ export class CartController {
     }
   }
 
+  // Admin endpoints - GENERIC ROUTES LAST
+  @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create a new cart (admin only)' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Cart created successfully' })
+  async create(@Body() createCartDto: CreateCartDto) {
+    try {
+      const cart = await this.cartService.create(createCartDto);
+      return successResponse(cart, 'Cart created successfully', HttpStatus.CREATED);
+    } catch (error) {
+      return errorResponse(error.message, HttpStatus.BAD_REQUEST, error);
+    }
+  }
+
+  @Get()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all carts (admin only)' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'All carts retrieved successfully' })
+  async findAll() {
+    try {
+      const carts = await this.cartService.findAll();
+      return successResponse(carts, 'All carts retrieved successfully');
+    } catch (error) {
+      return errorResponse(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @Get(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get cart by ID (admin only)' })
+  @ApiParam({ name: 'id', description: 'Cart ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Cart retrieved successfully' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Cart not found' })
+  async findOne(@Param('id') id: string) {
+    try {
+      const cart = await this.cartService.findOne(id);
+      return successResponse(cart, 'Cart retrieved successfully');
+    } catch (error) {
+      if (error instanceof HttpException) {
+        return errorResponse(error.message, error.getStatus());
+      }
+      return errorResponse(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
   @Patch(':id')
-  @ApiOperation({ summary: 'Update a cart by ID' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update a cart by ID (admin only)' })
   @ApiParam({ name: 'id', description: 'Cart ID' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Cart updated successfully' })
   async update(@Param('id') id: string, @Body() updateCartDto: UpdateCartDto) {
@@ -232,7 +233,10 @@ export class CartController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Delete a cart by ID' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete a cart by ID (admin only)' })
   @ApiParam({ name: 'id', description: 'Cart ID' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Cart deleted successfully' })
   async remove(@Param('id') id: string) {

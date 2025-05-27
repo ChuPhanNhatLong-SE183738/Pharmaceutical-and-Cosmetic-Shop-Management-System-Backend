@@ -6,7 +6,10 @@ import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { ProductsModule } from './products/products.module';
 import { CartModule } from './cart/cart.module';
+import { OrdersModule } from './orders/orders.module';
 import { CategoriesModule } from './categories/categories.module';
+import { PaymentsModule } from './payments/payments.module';
+import { TransactionsModule } from './transactions/transactions.module';
 import { InventoryLogsModule } from './inventory_logs/inventory_logs.module';
 
 @Module({
@@ -16,8 +19,8 @@ import { InventoryLogsModule } from './inventory_logs/inventory_logs.module';
     AuthModule,
     ProductsModule,
     CartModule,
+    OrdersModule,
     CategoriesModule,
-    InventoryLogsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
