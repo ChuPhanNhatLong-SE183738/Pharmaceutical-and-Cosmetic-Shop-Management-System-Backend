@@ -10,6 +10,7 @@ import { OrdersModule } from './orders/orders.module';
 import { CategoriesModule } from './categories/categories.module';
 import { PaymentsModule } from './payments/payments.module';
 import { TransactionsModule } from './transactions/transactions.module';
+import { InventoryLogsModule } from './inventory_logs/inventory_logs.module';
 
 @Module({
   imports: [

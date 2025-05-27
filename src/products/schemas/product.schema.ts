@@ -34,9 +34,17 @@ export class Product {
   @IsNotEmpty()
   @Prop({ 
     type: [{ type: MongooseSchema.Types.ObjectId, ref: 'Category' }],
-    required: true 
+    required: true,
+    get: (categories: any[]) => {
+      if (!categories) return [];
+      return categories;
+    },
+    set: (categories: any[]) => {
+      if (!categories) return [];
+      return categories;
+    }
   })
-  category: Category[] | string[];
+  category: Category[] | string[] | MongooseSchema.Types.ObjectId[];
 
   @IsNotEmpty()
   @Prop({ required: true })
@@ -69,4 +77,19 @@ export class Product {
   expiryDate: Date;
 }
 
-export const ProductSchema = SchemaFactory.createForClass(Product);
+const ProductSchema = SchemaFactory.createForClass(Product);
+
+ProductSchema.pre('save', function(next) {
+  if (this.isModified('stock') && !this.isModified('category')) {
+    this.$locals.skipCategoryValidation = true;
+  }
+  next();
+});
+
+ProductSchema.path('category').validate(function(value) {
+  if (this.$locals.skipCategoryValidation) {
+  }
+  return Array.isArray(value) && value.length > 0;
+});
+
+export { ProductSchema };
