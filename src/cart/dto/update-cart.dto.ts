@@ -1,33 +1,18 @@
-import { PartialType } from '@nestjs/swagger';
-import { IsMongoId, IsNumber, Min } from 'class-validator';
+import { PartialType } from '@nestjs/mapped-types';
 import { CreateCartDto } from './create-cart.dto';
-import { Types } from 'mongoose';
-import { ApiProperty } from '@nestjs/swagger';
-import { Transform, Type } from 'class-transformer';
+import { IsNotEmpty, IsNumber, IsString, IsMongoId, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class UpdateCartDto extends PartialType(CreateCartDto) {}
 
 export class AddToCartDto {
-  @ApiProperty({ description: 'Product ID to add to cart' })
-  @IsMongoId()
-  // Ensure consistent ObjectId transformation
-  @Transform(({ value }) => {
-    if (typeof value === 'string') {
-      return new Types.ObjectId(value);
-    }
-    return value;
-  })
-  productId: Types.ObjectId;
+  @IsNotEmpty()
+  @IsMongoId({ message: 'productId must be a mongodb id' })
+  productId: string;
 
-  @ApiProperty({ description: 'Quantity to add', minimum: 1 })
-  @IsNumber()
-  @Min(1)
-  @Type(() => Number)
+  @IsNotEmpty()
+  @IsNumber({}, { message: 'quantity must be a number' })
+  @Min(1, { message: 'quantity must be at least 1' })
+  @Type(() => Number) // This ensures string numbers are converted to numbers before validation
   quantity: number;
-  
-  @ApiProperty({ description: 'Product price' })
-  @IsNumber()
-  @Min(0)
-  @Type(() => Number)
-  price: number;
 }

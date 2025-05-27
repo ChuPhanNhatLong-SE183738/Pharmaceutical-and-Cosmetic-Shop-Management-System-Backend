@@ -8,6 +8,7 @@ import { UsersModule } from 'src/users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { RolesGuard } from './guards/roles.guard';
+import { CartModule } from '../cart/cart.module'; // Import CartModule
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { RolesGuard } from './guards/roles.guard';
       inject: [ConfigService],
     }),
     UsersModule,
+    CartModule, // Add CartModule to imports
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, LocalStrategy, RolesGuard],
