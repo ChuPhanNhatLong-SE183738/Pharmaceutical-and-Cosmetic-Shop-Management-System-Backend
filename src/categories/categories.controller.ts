@@ -34,6 +34,7 @@ export class CategoriesController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
   async update(@Param('id') id: string, @Body() updateCategoryDto: UpdateCategoryDto) {
     const updatedCategory = await this.categoriesService.update(id, updateCategoryDto);
     return successResponse(updatedCategory, 'Category updated successfully');
@@ -41,6 +42,7 @@ export class CategoriesController {
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
   async remove(@Param('id') id: string) {
     await this.categoriesService.remove(id);
     return successResponse(null, 'Category deleted successfully');

@@ -48,6 +48,7 @@ export class ProductsService {
 
     const products = await this.productModel
       .find(filter)
+      .populate('category')
       .sort({ [sortBy]: sortOrder })
       .skip(skip)
       .limit(Number(limit))
@@ -59,7 +60,7 @@ export class ProductsService {
   }
 
   async findOne(id: string): Promise<Product> {
-    const product = await this.productModel.findById(id).exec();
+    const product = await this.productModel.findById(id).populate('category').exec();
     if (!product) {
       throw new NotFoundException(`Product with ID ${id} not found`);
     }
@@ -97,8 +98,15 @@ export class ProductsService {
       throw new NotFoundException(`Product with ID ${id} not found`);
     }
 
-    product.stock += quantity;
-    return product.save();
+    const updatedProduct = await this.productModel.findByIdAndUpdate(
+      id,
+      { $inc: { stock: quantity } },
+      { new: true, runValidators: false }
+    ).exec();
+    if (!updatedProduct) {
+      throw new NotFoundException(`Product with ID ${id} not found`);
+    }
+    return updatedProduct;
   }
 
   async decrementStock(id: string, quantity: number): Promise<Product> {
@@ -107,11 +115,14 @@ export class ProductsService {
       throw new NotFoundException(`Product with ID ${id} not found`);
     }
 
-    if (product.stock < quantity) {
-      throw new Error('Insufficient stock');
+    const updatedProduct = await this.productModel.findByIdAndUpdate(
+      id,
+      { $inc: { stock: -quantity } },
+      { new: true, runValidators: false }
+    ).exec();
+    if (!updatedProduct) {
+      throw new NotFoundException(`Product with ID ${id} not found`);
     }
-
-    product.stock -= quantity;
-    return product.save();
+    return updatedProduct;
   }
 }
