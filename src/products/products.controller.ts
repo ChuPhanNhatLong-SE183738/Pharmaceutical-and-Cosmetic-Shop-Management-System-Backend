@@ -17,7 +17,9 @@ import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { Role } from 'src/users/enums/role.enum';
 import { successResponse } from 'src/helper/response.helper';
+import { ApiTags, ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
 
+@ApiTags('products')
 @Controller('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) { }
@@ -84,5 +86,13 @@ export class ProductsController {
   async decrementStock(@Param('id') id: string, @Body('quantity') quantity: number) {
     const product = await this.productsService.decrementStock(id, quantity);
     return successResponse(product, 'Product stock decremented successfully');
+  }
+
+  @Get(':id/price')
+  @ApiOperation({ summary: 'Get current price of a product with discount applied' })
+  @ApiParam({ name: 'id', description: 'Product ID' })
+  async getCurrentPrice(@Param('id') id: string) {
+    const price = await this.productsService.getCurrentPrice(id);
+    return { price };
   }
 }

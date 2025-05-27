@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Product, ProductDocument } from './schemas/product.schema';
+import { Product, ProductDocument } from './entities/product.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 
@@ -9,12 +9,12 @@ import { UpdateProductDto } from './dto/update-product.dto';
 export class ProductsService {
   constructor(@InjectModel(Product.name) private productModel: Model<ProductDocument>) {}
 
-  async create(createProductDto: CreateProductDto): Promise<Product> {
-    const createdProduct = new this.productModel(createProductDto);
-    return createdProduct.save();
+  async create(createProductDto: CreateProductDto): Promise<ProductDocument> {
+    const newProduct = new this.productModel(createProductDto);
+    return newProduct.save();
   }
 
-  async findAll(query?: any): Promise<{ products: Product[]; total: number }> {
+  async findAll(query?: any): Promise<{ products: ProductDocument[]; total: number }> {
     const {
       page = 1,
       limit = 10,
@@ -58,7 +58,7 @@ export class ProductsService {
     return { products, total };
   }
 
-  async findOne(id: string): Promise<Product> {
+  async findOne(id: string): Promise<ProductDocument> {
     const product = await this.productModel.findById(id).exec();
     if (!product) {
       throw new NotFoundException(`Product with ID ${id} not found`);
@@ -66,7 +66,19 @@ export class ProductsService {
     return product;
   }
 
-  async update(id: string, updateProductDto: UpdateProductDto): Promise<Product> {
+  async getCurrentPrice(id: string): Promise<number> {
+    const product = await this.findOne(id);
+
+    // Calculate price with sale percentage
+    const currentPrice =
+      product.salePercentage > 0
+        ? product.price * (1 - product.salePercentage / 100)
+        : product.price;
+
+    return currentPrice;
+  }
+
+  async update(id: string, updateProductDto: UpdateProductDto): Promise<ProductDocument> {
     const updatedProduct = await this.productModel
       .findByIdAndUpdate(id, updateProductDto, { new: true })
       .exec();
@@ -83,15 +95,15 @@ export class ProductsService {
     }
   }
 
-  async findByCategory(category: string): Promise<Product[]> {
+  async findByCategory(category: string): Promise<ProductDocument[]> {
     return this.productModel.find({ category: { $in: [category] } }).exec();
   }
 
-  async findByBrand(brand: string): Promise<Product[]> {
+  async findByBrand(brand: string): Promise<ProductDocument[]> {
     return this.productModel.find({ brand }).exec();
   }
 
-  async incrementStock(id: string, quantity: number): Promise<Product> {
+  async incrementStock(id: string, quantity: number): Promise<ProductDocument> {
     const product = await this.productModel.findById(id).exec();
     if (!product) {
       throw new NotFoundException(`Product with ID ${id} not found`);
@@ -101,7 +113,7 @@ export class ProductsService {
     return product.save();
   }
 
-  async decrementStock(id: string, quantity: number): Promise<Product> {
+  async decrementStock(id: string, quantity: number): Promise<ProductDocument> {
     const product = await this.productModel.findById(id).exec();
     if (!product) {
       throw new NotFoundException(`Product with ID ${id} not found`);

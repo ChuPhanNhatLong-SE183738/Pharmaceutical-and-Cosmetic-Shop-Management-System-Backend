@@ -21,6 +21,17 @@ export class CartController {
     private readonly productsService: ProductsService // Inject ProductsService
   ) {}
 
+  @UseGuards(JwtAuthGuard)
+  @Post('add')
+  async addToCart(@Request() req, @Body() addToCartDto: AddToCartDto) {
+    const userId = req.user.id;
+    return this.cartService.addToCart(
+      userId,
+      addToCartDto.productId,
+      addToCartDto.quantity,
+    );
+  }
+
   // Customer endpoints for their own cart - SPECIFIC ROUTES FIRST
   @Get('test-auth')
   @UseGuards(JwtAuthGuard)
@@ -81,7 +92,7 @@ export class CartController {
   @ApiOperation({ summary: 'Add an item to current user cart' })
   @ApiBearerAuth()
   @ApiResponse({ status: HttpStatus.OK, description: 'Item added to cart successfully' })
-  async addToCart(@Request() req, @Body() addToCartDto: AddToCartDto) {
+  async addToCartLegacy(@Request() req, @Body() addToCartDto: AddToCartDto) {
     try {
       if (!req.user) {
         throw new UnauthorizedException('User not authenticated');
@@ -94,7 +105,11 @@ export class CartController {
       }
 
       const userObjectId = new Types.ObjectId(userId.toString());
-      const updatedCart = await this.cartService.addToCart(userObjectId, addToCartDto);
+      const updatedCart = await this.cartService.addToCart(
+        userObjectId.toString(), 
+        addToCartDto.productId,
+        addToCartDto.quantity
+      );
       return successResponse(updatedCart, 'Item added to cart successfully');
     } catch (error) {
       this.logger.error(`Error in addToCart: ${error.message}`);

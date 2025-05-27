@@ -68,9 +68,9 @@ export class AuthService {
     // Create an empty cart for the new user
     // Cast the user object to any to bypass TypeScript's type checking for _id
     await this.cartService.create({
-      userId: new Types.ObjectId((user as any)._id.toString()),
+      userId: (user as any)._id.toString(),
       items: [],
-      totalPrice: 0
+      totalAmount: 0
     });
     
     const payload = {

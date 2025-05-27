@@ -1,9 +1,38 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { CreateCartDto } from './create-cart.dto';
-import { IsNotEmpty, IsNumber, IsString, IsMongoId, Min } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsString, IsMongoId, Min, IsArray, IsOptional, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import { Types } from 'mongoose';
 
-export class UpdateCartDto extends PartialType(CreateCartDto) {}
+export class CartItemDto {
+  @IsString()
+  productId: string;
+
+  @IsNumber()
+  @Min(1)
+  quantity: number;
+
+  @IsNumber()
+  @Min(0)
+  price: number;
+}
+
+export class UpdateCartDto {
+  @IsOptional()
+  @IsString()
+  userId?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CartItemDto)
+  items?: CartItemDto[];
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  totalAmount?: number;
+}
 
 export class AddToCartDto {
   @IsNotEmpty()
