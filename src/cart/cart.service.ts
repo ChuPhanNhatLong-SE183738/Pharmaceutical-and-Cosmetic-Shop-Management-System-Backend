@@ -11,7 +11,7 @@ import { Cart, CartDocument } from './entities/cart.entity';
 import { CreateCartDto } from './dto/create-cart.dto';
 import { UpdateCartDto, AddToCartDto } from './dto/update-cart.dto';
 import { ProductsService } from '../products/products.service';
-import { Product, ProductDocument } from '../products/entities/product.entity';
+import { Product, ProductDocument } from 'src/products/schemas/product.schema';
 
 @Injectable()
 export class CartService {
@@ -67,7 +67,7 @@ export class CartService {
 
     // Calculate price with sale percentage
     const discountedPrice =
-      product.salePercentage > 0
+      product.salePercentage !== null && product.salePercentage > 0
         ? product.price * (1 - product.salePercentage / 100)
         : product.price;
 
@@ -179,30 +179,30 @@ export class CartService {
   ): Promise<CartDocument> {
     try {
       const cart = await this.cartModel.findById(id);
-      
+
       if (!cart) {
         throw new NotFoundException(`Cart with ID ${id} not found`);
       }
-      
+
       if (updateCartDto.items) {
         // If updating items, recalculate total amount
         const totalAmount = updateCartDto.items.reduce(
           (total, item) => total + item.price * item.quantity,
-          0
+          0,
         );
         updateCartDto.totalAmount = totalAmount;
       }
-      
+
       const updatedCart = await this.cartModel.findByIdAndUpdate(
-        id, 
+        id,
         updateCartDto,
-        { new: true }
+        { new: true },
       );
-      
+
       if (!updatedCart) {
         throw new NotFoundException(`Failed to update cart with ID ${id}`);
       }
-      
+
       return updatedCart;
     } catch (error) {
       this.logger.error(`Error updating cart: ${error.message}`);
@@ -225,32 +225,40 @@ export class CartService {
     }
   }
 
-  async checkoutSelectedItems(userId: string, productIds: string[]): Promise<CartDocument> {
+  async checkoutSelectedItems(
+    userId: string,
+    productIds: string[],
+  ): Promise<CartDocument> {
     // Find the user's cart
-    const cart = await this.cartModel.findOne({ userId: new Types.ObjectId(userId) });
-    
+    const cart = await this.cartModel.findOne({
+      userId: new Types.ObjectId(userId),
+    });
+
     if (!cart) {
       throw new NotFoundException('Cart not found');
     }
 
     // Convert product IDs to ObjectId
-    const productObjectIds = productIds.map(id => new Types.ObjectId(id));
-    
+    const productObjectIds = productIds.map((id) => new Types.ObjectId(id));
+
     // Filter cart items to find which ones to keep and which ones to checkout
-    const itemsToKeep = cart.items.filter(item => {
+    const itemsToKeep = cart.items.filter((item) => {
       // Convert item.productId to string for reliable comparison
       const productIdString = item.productId.toString();
       // Check if this product ID is NOT in our checkout list
       return !productIds.includes(productIdString);
     });
-    
+
     // Replace cart items with only the items not in productIds
     cart.items = itemsToKeep;
-    
+
     // Recalculate total amount
-    const totalAmount = itemsToKeep.reduce((total, item) => total + (item.price * item.quantity), 0);
+    const totalAmount = itemsToKeep.reduce(
+      (total, item) => total + item.price * item.quantity,
+      0,
+    );
     cart.set('totalAmount', totalAmount);
-    
+
     // Save the updated cart with remaining items
     return await cart.save();
   }

@@ -1,6 +1,16 @@
-import { IsString, IsNumber, IsArray, IsOptional, IsEnum, Min, Max, IsDate, IsNotEmpty } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsArray,
+  IsOptional,
+  IsEnum,
+  Min,
+  Max,
+  IsDate,
+  IsNotEmpty,
+} from 'class-validator';
 import { Type } from 'class-transformer';
-import { SuitableFor } from '../entities/product.entity';
+import { SuitableForType } from '../schemas/product.schema';
 
 export class CreateProductDto {
   @IsNotEmpty()
@@ -40,8 +50,8 @@ export class CreateProductDto {
   ingredients: string;
 
   @IsOptional()
-  @IsEnum(SuitableFor)
-  suitableFor: SuitableFor;
+  @IsEnum(SuitableForType)
+  suitableFor: SuitableForType;
 
   @IsOptional()
   @IsNumber()
