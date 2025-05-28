@@ -224,4 +224,34 @@ export class CartService {
       throw error;
     }
   }
+
+  async checkoutSelectedItems(userId: string, productIds: string[]): Promise<CartDocument> {
+    // Find the user's cart
+    const cart = await this.cartModel.findOne({ userId: new Types.ObjectId(userId) });
+    
+    if (!cart) {
+      throw new NotFoundException('Cart not found');
+    }
+
+    // Convert product IDs to ObjectId
+    const productObjectIds = productIds.map(id => new Types.ObjectId(id));
+    
+    // Filter cart items to find which ones to keep and which ones to checkout
+    const itemsToKeep = cart.items.filter(item => {
+      // Convert item.productId to string for reliable comparison
+      const productIdString = item.productId.toString();
+      // Check if this product ID is NOT in our checkout list
+      return !productIds.includes(productIdString);
+    });
+    
+    // Replace cart items with only the items not in productIds
+    cart.items = itemsToKeep;
+    
+    // Recalculate total amount
+    const totalAmount = itemsToKeep.reduce((total, item) => total + (item.price * item.quantity), 0);
+    cart.set('totalAmount', totalAmount);
+    
+    // Save the updated cart with remaining items
+    return await cart.save();
+  }
 }

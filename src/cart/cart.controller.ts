@@ -128,6 +128,59 @@ export class CartController {
     }
   }
 
+  @Post('checkout-selected')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Checkout selected items from cart' })
+  @ApiBearerAuth()
+  @ApiResponse({ status: HttpStatus.OK, description: 'Selected items checked out successfully' })
+  @ApiBody({
+    description: 'List of product IDs to checkout',
+    schema: {
+      type: 'object',
+      properties: {
+        productIds: {
+          type: 'array',
+          items: {
+            type: 'string'
+          },
+          example: ['65f4a1b2c3d4e5f6a7b8c9d0', '65f4a1b2c3d4e5f6a7b8c9d1']
+        }
+      },
+      required: ['productIds']
+    }
+  })
+  async checkoutSelectedItems(@Request() req, @Body() checkoutDto: { productIds: string[] }) {
+    try {
+      if (!req.user) {
+        throw new UnauthorizedException('User not authenticated');
+      }
+      
+      const userId = req.user._id || req.user.id || req.user.sub;
+      
+      if (!userId) {
+        throw new UnauthorizedException('User ID not found in token');
+      }
+
+      if (!checkoutDto.productIds || checkoutDto.productIds.length === 0) {
+        throw new BadRequestException('No items selected for checkout');
+      }
+
+      // Process the checkout and remove selected items
+      const updatedCart = await this.cartService.checkoutSelectedItems(
+        userId.toString(),
+        checkoutDto.productIds
+      );
+      
+      return successResponse(updatedCart, 'Selected items checked out successfully');
+    } catch (error) {
+      this.logger.error(`Error in checkoutSelectedItems: ${error.message}`);
+      if (error instanceof HttpException) {
+        return errorResponse(error.message, error.getStatus());
+      }
+      return errorResponse('Failed to checkout selected items', HttpStatus.BAD_REQUEST, error);
+    }
+  }
+
   @Delete('remove-item/:productId')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Remove an item from current user cart' })
