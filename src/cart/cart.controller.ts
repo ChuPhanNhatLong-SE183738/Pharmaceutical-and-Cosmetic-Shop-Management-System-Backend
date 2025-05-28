@@ -2,7 +2,7 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, 
 import { CartService } from './cart.service';
 import { CreateCartDto } from './dto/create-cart.dto';
 import { UpdateCartDto, AddToCartDto } from './dto/update-cart.dto';
-import { ApiBearerAuth, ApiTags, ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags, ApiOperation, ApiParam, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { Types } from 'mongoose';
 import { successResponse, errorResponse } from '../helper/response.helper';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -20,18 +20,7 @@ export class CartController {
     private readonly cartService: CartService,
     private readonly productsService: ProductsService // Inject ProductsService
   ) {}
-
-  @UseGuards(JwtAuthGuard)
-  @Post('add')
-  async addToCart(@Request() req, @Body() addToCartDto: AddToCartDto) {
-    const userId = req.user.id;
-    return this.cartService.addToCart(
-      userId,
-      addToCartDto.productId,
-      addToCartDto.quantity,
-    );
-  }
-
+  
   // Customer endpoints for their own cart - SPECIFIC ROUTES FIRST
   @Get('test-auth')
   @UseGuards(JwtAuthGuard)
@@ -92,6 +81,25 @@ export class CartController {
   @ApiOperation({ summary: 'Add an item to current user cart' })
   @ApiBearerAuth()
   @ApiResponse({ status: HttpStatus.OK, description: 'Item added to cart successfully' })
+  @ApiBody({
+    description: 'Product information to add to cart',
+    schema: {
+      type: 'object',
+      properties: {
+        productId: {
+          type: 'string',
+          example: '65f4a1b2c3d4e5f6a7b8c9d0',
+          description: 'ID of the product to add to cart'
+        },
+        quantity: {
+          type: 'number',
+          example: 2,
+          description: 'Quantity of the product to add'
+        }
+      },
+      required: ['productId', 'quantity']
+    }
+  })
   async addToCartLegacy(@Request() req, @Body() addToCartDto: AddToCartDto) {
     try {
       if (!req.user) {
