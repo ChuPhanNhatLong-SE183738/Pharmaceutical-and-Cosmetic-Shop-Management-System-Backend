@@ -17,8 +17,8 @@ export class CartItem {
 
 @Schema({ timestamps: true })
 export class Cart {
-  @Prop({ required: true })
-  userId: string;
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Users', required: true })
+  userId: Types.ObjectId | MongooseSchema.Types.ObjectId;
 
   @Prop([CartItem])
   items: CartItem[];

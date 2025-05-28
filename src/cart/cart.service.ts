@@ -4,6 +4,7 @@ import {
   Logger,
   BadRequestException,
   InternalServerErrorException,
+  ConflictException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types, Schema as MongooseSchema } from 'mongoose';
@@ -163,12 +164,28 @@ export class CartService {
       if (!cart) {
         throw new NotFoundException(`Cart for user ${userId} not found`);
       }
-
-      cart.items = [];
-      cart.set('totalAmount', 0);
-      return cart.save();
+      
+      // Use findOneAndUpdate instead of manual save to avoid version conflicts
+      const updatedCart = await this.cartModel.findOneAndUpdate(
+        { userId },
+        { $set: { items: [], totalAmount: 0 } },
+        { new: true, runValidators: true }
+      );
+      
+      if (!updatedCart) {
+        throw new NotFoundException(`Failed to update cart for user ${userId}`);
+      }
+      
+      this.logger.debug(`Successfully cleared cart for user: ${userId}`);
+      return updatedCart;
     } catch (error) {
-      this.logger.error(`Error clearing cart: ${error.message}`);
+      this.logger.error(`Error clearing cart: ${error.message}`, error.stack);
+      
+      // Better error handling with specific messages
+      if (error.name === 'VersionError' || error.message.includes('version')) {
+        throw new ConflictException('Cart was modified by another operation. Please try again.');
+      }
+      
       throw error;
     }
   }
@@ -193,10 +210,11 @@ export class CartService {
         updateCartDto.totalAmount = totalAmount;
       }
 
+      // Use findOneAndUpdate to avoid version conflicts
       const updatedCart = await this.cartModel.findByIdAndUpdate(
         id,
         updateCartDto,
-        { new: true },
+        { new: true, runValidators: true },
       );
 
       if (!updatedCart) {
@@ -206,6 +224,11 @@ export class CartService {
       return updatedCart;
     } catch (error) {
       this.logger.error(`Error updating cart: ${error.message}`);
+      
+      if (error.name === 'VersionError' || error.message.includes('version')) {
+        throw new ConflictException('Cart was modified by another operation. Please try again.');
+      }
+      
       throw error;
     }
   }
@@ -229,37 +252,58 @@ export class CartService {
     userId: string,
     productIds: string[],
   ): Promise<CartDocument> {
-    // Find the user's cart
-    const cart = await this.cartModel.findOne({
-      userId: new Types.ObjectId(userId),
-    });
+    try {
+      // Find the user's cart
+      const cart = await this.cartModel.findOne({
+        userId: new Types.ObjectId(userId),
+      });
 
-    if (!cart) {
-      throw new NotFoundException('Cart not found');
+      if (!cart) {
+        throw new NotFoundException('Cart not found');
+      }
+
+      // Convert product IDs to ObjectId
+      const productObjectIds = productIds.map((id) => new Types.ObjectId(id));
+
+      // Use findOneAndUpdate to avoid version conflicts
+      const updatedCart = await this.cartModel.findOneAndUpdate(
+        { userId: new Types.ObjectId(userId) },
+        {
+          $pull: {
+            items: {
+              productId: { $in: productObjectIds }
+            }
+          }
+        },
+        { new: true }
+      );
+
+      if (!updatedCart) {
+        throw new NotFoundException(`Failed to update cart for checkout`);
+      }
+
+      // Recalculate total amount
+      const totalAmount = updatedCart.items.reduce(
+        (total, item) => total + item.price * item.quantity,
+        0,
+      );
+      
+      // Update the total amount in a separate operation
+      const finalCart = await this.cartModel.findByIdAndUpdate(
+        updatedCart._id,
+        { totalAmount },
+        { new: true }
+      );
+
+      return finalCart || updatedCart;
+    } catch (error) {
+      this.logger.error(`Error in checkout selected items: ${error.message}`, error.stack);
+      
+      if (error.name === 'VersionError' || error.message.includes('version')) {
+        throw new ConflictException('Cart was modified by another operation. Please try again.');
+      }
+      
+      throw error;
     }
-
-    // Convert product IDs to ObjectId
-    const productObjectIds = productIds.map((id) => new Types.ObjectId(id));
-
-    // Filter cart items to find which ones to keep and which ones to checkout
-    const itemsToKeep = cart.items.filter((item) => {
-      // Convert item.productId to string for reliable comparison
-      const productIdString = item.productId.toString();
-      // Check if this product ID is NOT in our checkout list
-      return !productIds.includes(productIdString);
-    });
-
-    // Replace cart items with only the items not in productIds
-    cart.items = itemsToKeep;
-
-    // Recalculate total amount
-    const totalAmount = itemsToKeep.reduce(
-      (total, item) => total + item.price * item.quantity,
-      0,
-    );
-    cart.set('totalAmount', totalAmount);
-
-    // Save the updated cart with remaining items
-    return await cart.save();
   }
 }

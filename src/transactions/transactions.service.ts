@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Transaction, TransactionDocument } from './entities/transaction.entity';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
+import { UpdateTransactionDto } from './dto/update-transaction.dto';
 
 @Injectable()
 export class TransactionsService {
@@ -24,5 +25,29 @@ export class TransactionsService {
 
   async findAll(): Promise<Transaction[]> {
     return this.transactionModel.find().sort({ createdAt: -1 }).exec();
+  }
+
+  async updateStatus(id: string, status: string): Promise<TransactionDocument> {
+    const transaction = await this.transactionModel.findById(id).exec();
+    if (!transaction) {
+      throw new NotFoundException(`Transaction with ID ${id} not found`);
+    }
+    
+    transaction.status = status;
+    return transaction.save();
+  }
+
+  async update(id: string, updateData: any): Promise<TransactionDocument> {
+    const transaction = await this.transactionModel.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true }
+    ).exec();
+    
+    if (!transaction) {
+      throw new NotFoundException(`Transaction with ID ${id} not found`);
+    }
+    
+    return transaction;
   }
 }

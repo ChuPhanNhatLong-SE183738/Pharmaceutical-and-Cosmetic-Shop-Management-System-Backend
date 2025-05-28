@@ -6,6 +6,8 @@ import { PaymentsController } from './payments.controller';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TransactionsModule } from 'src/transactions/transactions.module';
 import { CartModule } from '../cart/cart.module';
+import { OrdersModule } from '../orders/orders.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
     imports: [
@@ -23,6 +25,8 @@ import { CartModule } from '../cart/cart.module';
         }),
         TransactionsModule,
         CartModule,
+        OrdersModule,
+        NotificationsModule,
     ],
     controllers: [PaymentsController],
     providers: [PaymentsService],
