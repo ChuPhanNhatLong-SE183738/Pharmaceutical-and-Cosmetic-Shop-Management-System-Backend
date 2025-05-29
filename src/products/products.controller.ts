@@ -21,8 +21,6 @@ import {
   ApiTags,
   ApiOperation,
   ApiParam,
-  ApiResponse,
-  ApiBody,
   ApiBearerAuth,
 } from '@nestjs/swagger';
 
@@ -33,94 +31,8 @@ export class ProductsController {
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.STAFF)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Create a new product' })
-  @ApiResponse({ status: 201, description: 'Product successfully created.' })
-  @ApiResponse({ status: 400, description: 'Invalid data provided.' })
-  @ApiBody({
-    description: 'Product data',
-    schema: {
-      type: 'object',
-      properties: {
-        productName: {
-          type: 'string',
-          example: 'Vitamin C Serum',
-          description: 'Name of the product',
-        },
-        productDescription: {
-          type: 'string',
-          example:
-            'Brightening serum with 20% vitamin C that helps reduce dark spots',
-          description: 'Detailed description of the product',
-        },
-        price: {
-          type: 'number',
-          example: 45.99,
-          description: 'Price of the product',
-        },
-        stock: {
-          type: 'number',
-          example: 100,
-          description: 'Available quantity in stock',
-        },
-        category: {
-          type: 'array',
-          items: {
-            type: 'string',
-          },
-          example: ['skincare', 'serum', 'face'],
-          description: 'Product categories',
-        },
-        brand: {
-          type: 'string',
-          example: 'GlowBright',
-          description: 'Brand name',
-        },
-        productImages: {
-          type: 'array',
-          items: {
-            type: 'string',
-          },
-          example: [
-            'https://example.com/images/vitamin-c-serum-1.jpg',
-            'https://example.com/images/vitamin-c-serum-2.jpg',
-          ],
-          description: 'URLs to product images',
-        },
-        ingredients: {
-          type: 'string',
-          example: 'Water, Ascorbic Acid, Glycerin, Propylene Glycol',
-          description: 'Product ingredients',
-        },
-        suitableFor: {
-          type: 'string',
-          example: 'All skin types',
-          description: 'Skin type suitability',
-          enum: [
-            'All skin types',
-            'Dry skin',
-            'Oily skin',
-            'Sensitive skin',
-            'Combination skin',
-            'Normal skin',
-          ],
-        },
-        salePercentage: {
-          type: 'number',
-          example: 0,
-          description: 'Discount percentage',
-        },
-        expiryDate: {
-          type: 'string',
-          format: 'date',
-          example: '2025-12-31',
-          description: 'Product expiry date',
-        },
-      },
-      required: ['productName', 'price', 'stock'],
-    },
-  })
   async create(@Body() createProductDto: CreateProductDto) {
     const product = await this.productsService.create(createProductDto);
     return successResponse(product, 'Product created successfully');
