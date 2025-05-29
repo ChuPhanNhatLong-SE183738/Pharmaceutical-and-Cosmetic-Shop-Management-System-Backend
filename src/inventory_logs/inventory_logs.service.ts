@@ -113,12 +113,7 @@ export class InventoryLogsService {
       }
       
       const { action } = inventoryLog;
-      
-      type ProductItem = {
-        productId: string | { _id: Types.ObjectId } | Types.ObjectId;
-        quantity: number;
-        [key: string]: any;
-      };
+  
 
       for (const item of inventoryLog.products) {
         let productId: string;

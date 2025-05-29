@@ -11,6 +11,7 @@ import { CategoriesModule } from './categories/categories.module';
 import { PaymentsModule } from './payments/payments.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { InventoryLogsModule } from './inventory_logs/inventory_logs.module';
+import { ReviewsModule } from './reviews/reviews.module';
 
 @Module({
   imports: [
@@ -24,13 +25,15 @@ import { InventoryLogsModule } from './inventory_logs/inventory_logs.module';
         uri: configService.get<string>('DB_CONNECTION_LINK'),
       }),
     }),
-    ProductsModule, // Import products module first
-    CartModule, // Then cart module (which depends on products)
+    ProductsModule, 
+    CartModule, 
     AuthModule,
     OrdersModule,
     CategoriesModule,
     PaymentsModule,
     TransactionsModule,
+    ReviewsModule,
+    InventoryLogsModule, 
   ],
   controllers: [AppController],
   providers: [AppService],

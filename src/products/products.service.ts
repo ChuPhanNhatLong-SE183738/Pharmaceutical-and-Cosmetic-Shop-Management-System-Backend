@@ -78,7 +78,6 @@ export class ProductsService {
   async getCurrentPrice(id: string): Promise<number> {
     const product = await this.findOne(id);
 
-    // Calculate price with sale percentage
     const currentPrice =
       product.salePercentage !== null && product.salePercentage > 0
         ? product.price * (1 - product.salePercentage / 100)
@@ -152,4 +151,19 @@ export class ProductsService {
     }
     return updatedProduct;
   }
+
+   async updateRating(productId: string, averageRating: number, reviewCount: number): Promise<void> {
+    await this.productModel.findByIdAndUpdate(
+      productId,
+      {
+        $set: {
+          averageRating,
+          reviewCount,
+        },
+      },
+      { new: true }
+    );
+  }
 }
+
+

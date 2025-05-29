@@ -66,8 +66,11 @@ export class Product {
   })
   suitableFor: string;
 
-  @Prop({ type: [String], default: [] })
-  reviews: string[];
+  @Prop({ type: [{ type: MongooseSchema.Types.ObjectId, ref: 'Reviews' }], default: [] })
+  reviews: string[] | MongooseSchema.Types.ObjectId[];
+
+  @Prop({ type: Number, default: 0 })
+  averageRating: number;
 
   @Prop({ type: Number, default: null })
   salePercentage: number | null;
