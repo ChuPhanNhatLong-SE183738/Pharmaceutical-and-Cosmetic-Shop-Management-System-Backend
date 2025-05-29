@@ -53,8 +53,9 @@ export class CartService {
         .populate({
           path: 'items.productId',
           model: 'Product',
+          select:
+            'productName price image productImages brand productDescription', // Changed from 'name' to 'productName'
         })
-        .lean()
         .exec();
 
       if (!cart) {
@@ -62,28 +63,10 @@ export class CartService {
         return null;
       }
 
-      // Log the populated cart to debug
-      this.logger.debug('Raw populated cart:', JSON.stringify(cart, null, 2));
-
-      // Ensure cart is properly populated
-      if (cart.items) {
-        cart.items = cart.items.map((item) => {
-          const product = item.productId;
-          this.logger.debug('Product data:', JSON.stringify(product, null, 2));
-          return {
-            ...item,
-            productId: {
-              ...product,
-              // Ensure these fields are available
-              name: product.productName,
-              image:
-                product.image ||
-                (product.productImages && product.productImages[0]),
-            },
-          };
-        });
-      }
-
+      this.logger.debug(
+        'Found cart with items:',
+        JSON.stringify(cart, null, 2),
+      );
       return cart;
     } catch (error) {
       this.logger.error(
