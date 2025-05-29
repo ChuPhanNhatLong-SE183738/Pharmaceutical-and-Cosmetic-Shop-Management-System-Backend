@@ -12,6 +12,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { InventoryLogsModule } from './inventory_logs/inventory_logs.module';
 import { ReviewsModule } from './reviews/reviews.module';
+import { AnalyseModule } from './analyse/analyse.module';
 
 @Module({
   imports: [
@@ -33,7 +34,8 @@ import { ReviewsModule } from './reviews/reviews.module';
     PaymentsModule,
     TransactionsModule,
     ReviewsModule,
-    InventoryLogsModule, 
+    InventoryLogsModule,
+    AnalyseModule, 
   ],
   controllers: [AppController],
   providers: [AppService],
