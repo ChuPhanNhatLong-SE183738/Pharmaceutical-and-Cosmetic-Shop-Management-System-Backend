@@ -72,4 +72,13 @@ export class AuthController {
     const userId = req.user.sub || req.user.id;
     return this.authService.getMyProfile(userId);
   }
+
+  @Get('debug-token')
+  @UseGuards(JwtAuthGuard)
+  async debugToken(@Request() req) {
+    return {
+      user: req.user,
+      message: 'This is what your token contains'
+    };
+  }
 }

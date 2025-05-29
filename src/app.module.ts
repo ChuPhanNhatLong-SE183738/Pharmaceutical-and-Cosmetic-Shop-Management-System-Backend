@@ -13,6 +13,7 @@ import { TransactionsModule } from './transactions/transactions.module';
 import { InventoryLogsModule } from './inventory_logs/inventory_logs.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { AnalyseModule } from './analyse/analyse.module';
+import { ShippingLogsModule } from './shipping_logs/shipping_logs.module';
 
 @Module({
   imports: [
@@ -35,7 +36,8 @@ import { AnalyseModule } from './analyse/analyse.module';
     TransactionsModule,
     ReviewsModule,
     InventoryLogsModule,
-    AnalyseModule, 
+    AnalyseModule,
+    ShippingLogsModule, 
   ],
   controllers: [AppController],
   providers: [AppService],

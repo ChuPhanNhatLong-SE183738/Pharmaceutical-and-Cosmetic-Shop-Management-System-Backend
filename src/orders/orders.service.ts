@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { ModuleRef } from '@nestjs/core';
 import {
   Orders,
   OrdersDocument,
@@ -17,21 +18,29 @@ import { UpdateOrderDto } from './dto/update-order.dto';
 import { CartService } from '../cart/cart.service';
 import { UsersService } from '../users/users.service';
 import { Product, ProductDocument } from '../products/schemas/product.schema';
-import { User } from '../users/entities/user.entity'; // Add this import
-import { Transaction } from '../transactions/entities/transaction.entity'; // Add this import
+import { User } from '../users/entities/user.entity';
+import { Transaction } from '../transactions/entities/transaction.entity';
+import { ShippingLogsService } from '../shipping_logs/shipping_logs.service';
 
 @Injectable()
 export class OrdersService {
   private readonly logger = new Logger(OrdersService.name);
+  private shippingLogsService: ShippingLogsService;
 
   constructor(
     @InjectModel(Orders.name) private ordersModel: Model<OrdersDocument>,
     @InjectModel(Order_Items.name)
     private orderItemsModel: Model<Order_ItemsDocument>,
-    @InjectModel(Product.name) private productModel: Model<ProductDocument>, // Add this line
+    @InjectModel(Product.name) private productModel: Model<ProductDocument>,
     private readonly cartService: CartService,
     private readonly usersService: UsersService,
-  ) {}
+    private readonly moduleRef: ModuleRef,
+  ) {
+    // We'll resolve the ShippingLogsService after initialization to avoid circular dependencies
+    setTimeout(() => {
+      this.shippingLogsService = this.moduleRef.get(ShippingLogsService, { strict: false });
+    }, 0);
+  }
 
   async createOrder(createOrderDto: CreateOrderDto) {
     const newOrder = new this.ordersModel({
@@ -272,35 +281,50 @@ export class OrdersService {
         throw new NotFoundException(`Order with ID ${id} not found`);
       }
 
-      // Cập nhật trạng thái đơn hàng
+      // Update order status
       order.status = data.status;
 
-      // Lưu note nếu có
+      // Save note if provided
       if (data.note) {
         order.notes = data.note;
       }
 
-      // Lưu lý do từ chối nếu có và trạng thái là rejected
+      // Save rejection reason if applicable
       if (data.status === 'rejected' && data.rejectionReason) {
-        // Use set method for properties that might not be in the type definition
         order.set('rejectionReason', data.rejectionReason);
       }
 
-      // Lưu người xử lý đơn hàng
+      // Save processor information
       if (data.processedBy) {
-        // Use set method for properties that might not be in the type definition
         order.set('processedBy', new Types.ObjectId(data.processedBy));
       }
 
       const updatedOrder = await order.save();
-      this.logger.debug(
-        `Order ${id} has been ${data.status} by ${data.processedBy}`,
-      );
+      this.logger.debug(`Order ${id} has been ${data.status} by ${data.processedBy}`);
 
-      // Explicitly cast _id to string
-      return this.findOne(id); // Just use the original id parameter instead
+      // Create shipping log if order is approved
+      if (data.status === 'approved') {
+        try {
+          // Make sure shippingLogsService is initialized
+          if (!this.shippingLogsService) {
+            this.shippingLogsService = this.moduleRef.get(ShippingLogsService, { strict: false });
+          }
+          
+          const createdLog = await this.shippingLogsService.createFromApprovedOrder(
+            id, 
+            order.totalAmount
+          );
+          
+          this.logger.debug(`Created shipping log for order ${id}: ${createdLog._id}`);
+        } catch (error) {
+          this.logger.error(`Failed to create shipping log: ${error.message}`, error.stack);
+          // Continue execution even if shipping log creation fails
+        }
+      }
+
+      return this.findOne(id);
     } catch (error) {
-      this.logger.error(`Error processing order: ${error.message}`);
+      this.logger.error(`Error processing order: ${error.message}`, error.stack);
       throw error;
     }
   }
