@@ -405,4 +405,32 @@ export class OrdersService {
       throw error;
     }
   }
+
+  async findOrdersByUserId(userId: string) {
+    try {
+      const orders = await this.ordersModel
+        .find({ userId: new Types.ObjectId(userId) })
+        .populate('userId', 'name email phone address')
+        .populate('transactionId')
+        .sort({ createdAt: -1 })
+        .exec();
+
+      // Get items for each order
+      const ordersWithItems = await Promise.all(
+        orders.map(async (order) => {
+          const orderId =
+            order._id instanceof Types.ObjectId
+              ? order._id.toString()
+              : String(order._id);
+          const items = await this.findOne(orderId);
+          return items;
+        }),
+      );
+
+      return ordersWithItems;
+    } catch (error) {
+      this.logger.error(`Error finding orders by user ID: ${error.message}`);
+      throw error;
+    }
+  }
 }
