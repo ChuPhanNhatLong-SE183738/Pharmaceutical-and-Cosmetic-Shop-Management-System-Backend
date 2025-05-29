@@ -62,4 +62,14 @@ export class AuthController {
       return errorResponse(error.message, HttpStatus.UNAUTHORIZED);
     }
   }
+
+  @Get('my-profile')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get current user profile' })
+  @ApiResponse({ status: 200, description: 'Returns user profile' })
+  @ApiBearerAuth()
+  async getMyProfile(@Request() req) {
+    const userId = req.user.sub || req.user.id;
+    return this.authService.getMyProfile(userId);
+  }
 }

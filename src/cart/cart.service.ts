@@ -45,6 +45,54 @@ export class CartService {
     }
   }
 
+  async findOneWithPopulatedItems(id: string): Promise<CartDocument | null> {
+    this.logger.debug(`Finding cart with populated items for ID: ${id}`);
+    try {
+      const cart = await this.cartModel
+        .findById(id)
+        .populate({
+          path: 'items.productId',
+          model: 'Product',
+        })
+        .lean()
+        .exec();
+
+      if (!cart) {
+        this.logger.warn(`Cart not found with ID: ${id}`);
+        return null;
+      }
+
+      // Log the populated cart to debug
+      this.logger.debug('Raw populated cart:', JSON.stringify(cart, null, 2));
+
+      // Ensure cart is properly populated
+      if (cart.items) {
+        cart.items = cart.items.map((item) => {
+          const product = item.productId;
+          this.logger.debug('Product data:', JSON.stringify(product, null, 2));
+          return {
+            ...item,
+            productId: {
+              ...product,
+              // Ensure these fields are available
+              name: product.productName,
+              image:
+                product.image ||
+                (product.productImages && product.productImages[0]),
+            },
+          };
+        });
+      }
+
+      return cart;
+    } catch (error) {
+      this.logger.error(
+        `Error finding cart with populated items: ${error.message}`,
+      );
+      throw error;
+    }
+  }
+
   async findByUserId(userId: Types.ObjectId): Promise<CartDocument | null> {
     this.logger.log(`Finding cart for user: ${userId}`);
 
@@ -164,28 +212,30 @@ export class CartService {
       if (!cart) {
         throw new NotFoundException(`Cart for user ${userId} not found`);
       }
-      
+
       // Use findOneAndUpdate instead of manual save to avoid version conflicts
       const updatedCart = await this.cartModel.findOneAndUpdate(
         { userId },
         { $set: { items: [], totalAmount: 0 } },
-        { new: true, runValidators: true }
+        { new: true, runValidators: true },
       );
-      
+
       if (!updatedCart) {
         throw new NotFoundException(`Failed to update cart for user ${userId}`);
       }
-      
+
       this.logger.debug(`Successfully cleared cart for user: ${userId}`);
       return updatedCart;
     } catch (error) {
       this.logger.error(`Error clearing cart: ${error.message}`, error.stack);
-      
+
       // Better error handling with specific messages
       if (error.name === 'VersionError' || error.message.includes('version')) {
-        throw new ConflictException('Cart was modified by another operation. Please try again.');
+        throw new ConflictException(
+          'Cart was modified by another operation. Please try again.',
+        );
       }
-      
+
       throw error;
     }
   }
@@ -224,11 +274,13 @@ export class CartService {
       return updatedCart;
     } catch (error) {
       this.logger.error(`Error updating cart: ${error.message}`);
-      
+
       if (error.name === 'VersionError' || error.message.includes('version')) {
-        throw new ConflictException('Cart was modified by another operation. Please try again.');
+        throw new ConflictException(
+          'Cart was modified by another operation. Please try again.',
+        );
       }
-      
+
       throw error;
     }
   }
@@ -271,11 +323,11 @@ export class CartService {
         {
           $pull: {
             items: {
-              productId: { $in: productObjectIds }
-            }
-          }
+              productId: { $in: productObjectIds },
+            },
+          },
         },
-        { new: true }
+        { new: true },
       );
 
       if (!updatedCart) {
@@ -287,22 +339,27 @@ export class CartService {
         (total, item) => total + item.price * item.quantity,
         0,
       );
-      
+
       // Update the total amount in a separate operation
       const finalCart = await this.cartModel.findByIdAndUpdate(
         updatedCart._id,
         { totalAmount },
-        { new: true }
+        { new: true },
       );
 
       return finalCart || updatedCart;
     } catch (error) {
-      this.logger.error(`Error in checkout selected items: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Error in checkout selected items: ${error.message}`,
+        error.stack,
+      );
+
       if (error.name === 'VersionError' || error.message.includes('version')) {
-        throw new ConflictException('Cart was modified by another operation. Please try again.');
+        throw new ConflictException(
+          'Cart was modified by another operation. Please try again.',
+        );
       }
-      
+
       throw error;
     }
   }

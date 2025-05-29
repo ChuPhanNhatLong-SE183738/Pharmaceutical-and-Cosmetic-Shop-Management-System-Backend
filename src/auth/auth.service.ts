@@ -63,16 +63,18 @@ export class AuthService {
 
   async register(createUserDto: CreateUserDto, response: Response) {
     // Create the user
-    const user = await this.usersService.create(createUserDto) as UserDocument;
-    
+    const user = (await this.usersService.create(
+      createUserDto,
+    )) as UserDocument;
+
     // Create an empty cart for the new user
     // Cast the user object to any to bypass TypeScript's type checking for _id
     await this.cartService.create({
       userId: (user as any)._id.toString(),
       items: [],
-      totalAmount: 0
+      totalAmount: 0,
     });
-    
+
     const payload = {
       email: user.email,
       sub: user._id ? user._id.toString() : user.id?.toString(),
@@ -133,5 +135,51 @@ export class AuthService {
   async getUserFromToken(token: string) {
     const decoded = this.verifyToken(token);
     return this.usersService.findById(decoded.sub);
+  }
+
+  async getProfile(userId: string) {
+    try {
+      const user = await this.usersService.findOne(userId);
+
+      // Format response để phù hợp với format chung
+      return {
+        id: user._id,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role,
+        phone: user.phone || null,
+        address: user.address || null,
+        dob: user.dob || null,
+      };
+    } catch (error) {
+      throw new UnauthorizedException('User not found');
+    }
+  }
+
+  async getMyProfile(userId: string) {
+    try {
+      const user = await this.usersService.findById(userId);
+
+      if (!user) {
+        throw new UnauthorizedException('User not found');
+      }
+
+      // Convert user document to plain object and format response
+      const userObject = user.toObject();
+
+      return {
+        id: userObject._id,
+        email: userObject.email,
+        fullName: userObject.fullName,
+        role: userObject.role,
+        phone: userObject.phone || null,
+        address: userObject.address || null,
+        dob: userObject.dob || null,
+        createdAt: userObject.createdAt,
+        updatedAt: userObject.updatedAt,
+      };
+    } catch (error) {
+      throw new UnauthorizedException('Failed to fetch user profile');
+    }
   }
 }

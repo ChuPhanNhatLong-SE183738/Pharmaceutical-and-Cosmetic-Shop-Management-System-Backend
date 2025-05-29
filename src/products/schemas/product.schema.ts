@@ -16,16 +16,17 @@ export type ProductDocument = Product & Document;
 
 @Schema({ timestamps: true })
 export class Product {
-  @IsNotEmpty()
   @Prop({ required: true })
   productName: string;
 
   @Prop()
-  productDescription: string;
+  image: string;
 
-  @IsNotEmpty()
-  @Prop({ required: true })
+  @Prop({ required: true, min: 0 })
   price: number;
+
+  @Prop()
+  productDescription: string;
 
   @IsNotEmpty()
   @Prop({ required: true })

@@ -17,7 +17,7 @@ export class PaymentsService {
     private readonly vnpayService: VnpayService,
     private readonly configService: ConfigService,
     private readonly transactionsService: TransactionsService,
-    private readonly ordersService: OrdersService, // Add this service
+    private readonly ordersService: OrdersService, // Keep this
     private readonly notificationsService: NotificationsService, // Add this service
   ) {}
 
@@ -139,10 +139,7 @@ export class PaymentsService {
             transactionId,
             'success',
           );
-          this.logger.debug(
-            `Updated existing transaction status: ${transaction._id}`,
-          );
-
+          
           // Update the paymentDetails with VNPay response data
           transaction = await this.transactionsService.update(
             transactionId,
@@ -197,11 +194,16 @@ export class PaymentsService {
           status: 'pending', // Order starts with pending status
         });
 
+        if (!createdOrder) {
+          throw new Error('Failed to create order');
+        }
+
         // Use explicit type conversion for createdOrder._id
-        const orderIdString =
-          createdOrder._id instanceof Types.ObjectId
-            ? createdOrder._id.toString()
-            : String(createdOrder._id);
+        const orderIdString = createdOrder?._id instanceof Types.ObjectId
+          ? createdOrder._id.toString()
+          : String(createdOrder._id || '');
+
+        this.logger.debug('Order created:', orderIdString);
 
         // Send notification to staff about the new order that needs confirmation
         await this.notificationsService.createStaffNotification({
