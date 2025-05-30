@@ -11,12 +11,19 @@ import { User, UserDocument } from './entities/user.entity';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import axios from 'axios';
+import { ConfigService } from '@nestjs/config';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
 
-  constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
+  constructor(
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    private readonly configService: ConfigService,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
 
   async create(createUserDto: CreateUserDto): Promise<UserDocument> {
     const existingUser = await this.userModel.findOne({
@@ -52,9 +59,9 @@ export class UsersService {
         this.logger.warn('Attempted to find user with undefined or empty ID');
         throw new BadRequestException('User ID is required');
       }
-      
+
       let userId;
-      
+
       // Handle different ID formats
       if (Types.ObjectId.isValid(id)) {
         // Only convert to ObjectId if it's a valid one
@@ -63,18 +70,21 @@ export class UsersService {
         // Use as string if it's not a valid ObjectId
         userId = id;
       }
-      
+
       this.logger.log(`Looking for user with ID: ${id}`);
       const user = await this.userModel.findById(userId).exec();
-      
+
       if (!user) {
         this.logger.warn(`User with ID ${id} not found in database`);
         throw new NotFoundException(`User with ID ${id} not found`);
       }
-      
+
       return user;
     } catch (error) {
-      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
         throw error; // Re-throw these specific errors
       }
       this.logger.error(`Error finding user with ID ${id}:`, error);
@@ -90,25 +100,28 @@ export class UsersService {
         this.logger.warn('Attempted to find user with undefined or empty ID');
         throw new BadRequestException('User ID is required');
       }
-      
+
       // Convert string ID to ObjectId if it's not already one and it's valid
       let objectId: any = id;
       if (typeof id === 'string' && Types.ObjectId.isValid(id)) {
         objectId = new Types.ObjectId(id);
       }
-      
+
       this.logger.log(`Looking up user with objectId: ${objectId}`);
       const user = await this.userModel.findById(objectId).exec();
-      
+
       if (!user) {
         this.logger.warn(`No user found with ID: ${id}`);
         throw new NotFoundException(`User with ID ${id} not found`);
       }
-      
+
       this.logger.log(`Found user with email: ${user.email}`);
       return user;
     } catch (error) {
-      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
         throw error; // Re-throw these specific errors
       }
       this.logger.error(`Error finding user by ID: ${id} - ${error.message}`);
@@ -146,5 +159,45 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
     return user;
+  }
+
+  async changeAvatar(
+    userId: string,
+    file: Express.Multer.File,
+  ): Promise<UserDocument> {
+    try {
+      // Check if user exists
+      const user = await this.userModel.findById(userId);
+      if (!user) {
+        throw new BadRequestException('User not found');
+      }
+
+      // Check if file was uploaded
+      if (!file) {
+        throw new BadRequestException('No file uploaded');
+      }
+
+      this.logger.debug(`Uploading avatar for user: ${userId}`);
+      
+      // Upload to Cloudinary with optimization settings
+      const imageUrl = await this.cloudinaryService.uploadImage(file, {
+        folder: 'avatars',
+        width: 400, // Reasonable size for avatar
+        height: 400,
+        crop: 'fill', // Crop and resize to exact dimensions
+        quality: 'auto' // Auto-optimize quality
+      });
+      
+      // Update user's photo URL
+      user.photoUrl = imageUrl;
+      await user.save();
+
+      this.logger.debug(`Successfully updated avatar for user ${userId}: ${imageUrl}`);
+      
+      return user;
+    } catch (error) {
+      this.logger.error(`Avatar upload failed: ${error.message}`);
+      throw new BadRequestException(`Failed to update avatar: ${error.message}`);
+    }
   }
 }

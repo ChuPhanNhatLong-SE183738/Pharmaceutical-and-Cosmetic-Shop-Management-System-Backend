@@ -14,11 +14,19 @@ import { InventoryLogsModule } from './inventory_logs/inventory_logs.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { AnalyseModule } from './analyse/analyse.module';
 import { ShippingLogsModule } from './shipping_logs/shipping_logs.module';
+import { CloudinaryModule } from './cloudinary/cloudinary.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: '.env',
+      load: [
+        () => ({
+          IMGUR_CLIENT_ID: process.env.IMGUR_CLIENT_ID,
+          // ...other env variables
+        }),
+      ],
     }),
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
@@ -27,8 +35,8 @@ import { ShippingLogsModule } from './shipping_logs/shipping_logs.module';
         uri: configService.get<string>('DB_CONNECTION_LINK'),
       }),
     }),
-    ProductsModule, 
-    CartModule, 
+    ProductsModule,
+    CartModule,
     AuthModule,
     OrdersModule,
     CategoriesModule,
@@ -37,7 +45,8 @@ import { ShippingLogsModule } from './shipping_logs/shipping_logs.module';
     ReviewsModule,
     InventoryLogsModule,
     AnalyseModule,
-    ShippingLogsModule, 
+    ShippingLogsModule,
+    CloudinaryModule,
   ],
   controllers: [AppController],
   providers: [AppService],

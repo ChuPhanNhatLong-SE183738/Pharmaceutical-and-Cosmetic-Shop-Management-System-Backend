@@ -31,15 +31,24 @@ export class User {
 
   @IsPhoneNumber()
   @Prop()
+  @Prop({ required: true })
   phone: string;
 
   @IsString()
   @Prop()
+  @Prop({ required: true })
   address: string;
 
   @IsDateString()
   @Prop()
+  @Prop({ required: true })
   dob: string;
+
+  @IsString()
+  @Prop({
+    default: 'https://media.tenor.com/iYxImvPgPnIAAAAe/horse-horses.png',
+  })
+  photoUrl: string;
 
   @IsBoolean()
   @Prop({ default: false })
