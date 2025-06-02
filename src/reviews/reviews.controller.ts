@@ -16,8 +16,12 @@ export class ReviewsController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.CUSTOMER)
-  async create(@Body() createReviewDto: CreateReviewDto) {
+  async create(@Body() createReviewDto: CreateReviewDto, @Req() req) {
     try {
+      const userId = req.user.userId || req.user.sub || req.user._id;
+      
+      createReviewDto.userId = userId;
+      
       const review = await this.reviewsService.create(createReviewDto);
       return successResponse(review, 'Review created successfully');
     } catch (error) {
@@ -86,6 +90,40 @@ export class ReviewsController {
     } catch (error) {
       this.logger.error(`Failed to delete review: ${error.message}`);
       return errorResponse(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @Get('can-review/:productId')
+  @UseGuards(JwtAuthGuard)
+  async canReviewProduct(@Param('productId') productId: string, @Req() req) {
+    try {
+      const userId = req.user.userId || req.user.sub || req.user._id;
+      
+      const existingReview = await this.reviewsService.findUserReviewForProduct(userId, productId);
+      
+      if (existingReview) {
+        return successResponse(
+          { canReview: false, reason: 'already_reviewed' },
+          'You have already reviewed this product'
+        );
+      }
+      
+      const hasPurchased = await this.reviewsService.hasUserPurchasedProduct(userId, productId);
+      
+      if (!hasPurchased) {
+        return successResponse(
+          { canReview: false, reason: 'not_purchased' },
+          'You can only review products you have purchased'
+        );
+      }
+      
+      return successResponse(
+        { canReview: true },
+        'You can review this product'
+      );
+    } catch (error) {
+      this.logger.error(`Error checking review eligibility: ${error.message}`);
+      return errorResponse(error.message, HttpStatus.BAD_REQUEST);
     }
   }
 }

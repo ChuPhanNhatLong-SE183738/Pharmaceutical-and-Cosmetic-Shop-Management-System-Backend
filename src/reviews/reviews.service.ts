@@ -6,6 +6,7 @@ import { UpdateReviewDto } from './dto/update-review.dto';
 import { Review, ReviewDocument } from './entities/review.entity';
 import { ProductsService } from '../products/products.service';
 import { Product } from '../products/schemas/product.schema';
+import { Orders } from '../orders/entities/order.entity';
 
 @Injectable()
 export class ReviewsService {
@@ -14,6 +15,7 @@ export class ReviewsService {
   constructor(
     @InjectModel(Review.name) private reviewModel: Model<ReviewDocument>,
     @InjectModel(Product.name) private productModel: Model<Product>,
+    @InjectModel(Orders.name) private ordersModel: Model<Orders>,
     private readonly productsService: ProductsService
   ) {}
 
@@ -32,6 +34,16 @@ export class ReviewsService {
         throw new BadRequestException('You have already reviewed this product');
       }
       
+      // Check if the user has purchased this product
+      const hasPurchased = await this.verifyUserPurchasedProduct(
+        createReviewDto.userId,
+        createReviewDto.productId
+      );
+      
+      if (!hasPurchased) {
+        throw new BadRequestException('You can only review products you have purchased');
+      }
+      
       const newReview = new this.reviewModel({
         productId: new Types.ObjectId(createReviewDto.productId),
         userId: new Types.ObjectId(createReviewDto.userId),
@@ -41,6 +53,7 @@ export class ReviewsService {
       
       const savedReview = await newReview.save();
       
+      // Add review reference to the product's reviews array
       await this.productModel.findByIdAndUpdate(
         createReviewDto.productId,
         { $push: { reviews: savedReview._id } },
@@ -49,6 +62,7 @@ export class ReviewsService {
       
       this.logger.debug(`Added review ${savedReview._id} to product ${createReviewDto.productId}`);
       
+      // Update product's average rating
       await this.updateProductAverageRating(createReviewDto.productId);
       
       return savedReview;
@@ -58,6 +72,52 @@ export class ReviewsService {
         throw error;
       }
       throw new BadRequestException(`Failed to create review: ${error.message}`);
+    }
+  }
+
+  private async verifyUserPurchasedProduct(userId: string, productId: string): Promise<boolean> {
+    try {
+      const userOrders = await this.ordersModel
+        .find({ 
+          userId: new Types.ObjectId(userId),
+          status: { $in: ['approved', 'completed', 'delivered'] }
+        })
+        .exec();
+
+      if (!userOrders || userOrders.length === 0) {
+        this.logger.debug(`No completed orders found for user ${userId}`);
+        return false;
+      }
+
+      const orderIds = userOrders.map(order => order._id);
+      
+      const orderItemsWithProduct = await this.ordersModel.aggregate([
+        { 
+          $match: { 
+            _id: { $in: orderIds } 
+          }
+        },
+        {
+          $lookup: {
+            from: 'order_items',
+            localField: '_id',
+            foreignField: 'orderId',
+            as: 'items'
+          }
+        },
+        { $unwind: '$items' },
+        {
+          $match: {
+            'items.productId': new Types.ObjectId(productId)
+          }
+        },
+        { $limit: 1 }
+      ]).exec();
+
+      return orderItemsWithProduct.length > 0;
+    } catch (error) {
+      this.logger.error(`Error verifying user purchase: ${error.message}`);
+      return false;
     }
   }
 
@@ -153,7 +213,6 @@ export class ReviewsService {
       
       const productId = review.productId.toString();
       
-      // Remove the review reference from the product's reviews array
       await this.productModel.findByIdAndUpdate(
         productId,
         { $pull: { reviews: id } },
@@ -162,10 +221,8 @@ export class ReviewsService {
       
       this.logger.debug(`Removed review ${id} from product ${productId}`);
       
-      // Delete the actual review
       await this.reviewModel.deleteOne({ _id: id });
       
-      // Update product's average rating
       await this.updateProductAverageRating(productId);
       
       return { deleted: true };
@@ -202,6 +259,16 @@ export class ReviewsService {
     }
   }
 
+  async hasUserPurchasedProduct(userId: string, productId: string): Promise<boolean> {
+    return this.verifyUserPurchasedProduct(userId, productId);
+  }
+
+  async findUserReviewForProduct(userId: string, productId: string): Promise<ReviewDocument | null> {
+    return this.reviewModel.findOne({
+      userId: new Types.ObjectId(userId),
+      productId: new Types.ObjectId(productId)
+    }).exec();
+  }
 }
 
 

@@ -1,8 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
 import * as ort from 'onnxruntime-node';
 import * as sharp from 'sharp';
 import * as fs from 'fs';
 import * as path from 'path';
+import { Analyse, AnalyseDocument } from './entities/analyse.entity';
+import { CreateAnalyseDto } from './dto/create-analyse.dto';
+import { UpdateAnalyseDto } from './dto/update-analyse.dto';
+import { ProductsService } from '../products/products.service';
 
 export interface AnalyseResult {
   analyseIndex: number;
@@ -14,8 +20,12 @@ export class AnalyseService {
   private modelPath: string;
   private session?: ort.InferenceSession;
   private labels: string[];
+  private readonly logger = new Logger(AnalyseService.name);
 
-  constructor() {
+  constructor(
+    @InjectModel(Analyse.name) private analyseModel: Model<AnalyseDocument>,
+    private productsService: ProductsService,
+  ) {
     this.modelPath = path.join(process.cwd(), 'public', 'model.onnx');
     this.labels = ['oily', 'dry', 'normal'];
     this.initModel();
@@ -25,8 +35,9 @@ export class AnalyseService {
     try {
       // Create the inference session using the proper API
       this.session = await ort.InferenceSession.create(this.modelPath);
+      this.logger.log('ONNX model initialized successfully');
     } catch (error) {
-      console.error('Error initializing ONNX model:', error);
+      this.logger.error('Error initializing ONNX model:', error);
     }
   }
 
@@ -67,5 +78,118 @@ export class AnalyseService {
       analyseIndex,
       skinType: this.labels[analyseIndex],
     };
+  }
+
+  async saveAnalysis(createAnalyseDto: CreateAnalyseDto): Promise<AnalyseDocument> {
+    try {
+      const newAnalysis = new this.analyseModel({
+        userId: new Types.ObjectId(createAnalyseDto.userId),
+        imageUrl: createAnalyseDto.imageUrl,
+        skinType: createAnalyseDto.skinType,
+        analysisDate: new Date(),
+        recommendedProducts: createAnalyseDto.recommendedProducts?.map(rec => ({
+          ...rec,
+          productId: new Types.ObjectId(rec.productId),
+        })) || [],
+      });
+
+      return await newAnalysis.save();
+    } catch (error) {
+      this.logger.error(`Error saving analysis: ${error.message}`);
+      throw new BadRequestException(`Failed to save analysis: ${error.message}`);
+    }
+  }
+
+  async generateRecommendations(skinType: string): Promise<any[]> {
+    try {
+      const { products } = await this.productsService.findAll({
+        search: skinType,
+        limit: 5,
+      });
+
+      return products.map((product, index) => ({
+        recommendationId: `rec-${index + 1}-${Date.now()}`,
+        productId: (product._id as Types.ObjectId | string).toString(),
+        reason: `Suitable for ${skinType} skin type`,
+      }));
+    } catch (error) {
+      this.logger.error(`Error generating recommendations: ${error.message}`);
+      return [];
+    }
+  }
+
+  async processAndSaveAnalysis(
+    imageBuffer: Buffer,
+    userId: string,
+    imageUrl: string,
+  ): Promise<AnalyseDocument> {
+    const { skinType } = await this.runInference(imageBuffer);
+
+    const recommendations = await this.generateRecommendations(skinType);
+
+    const analysisData: CreateAnalyseDto = {
+      userId,
+      imageUrl,
+      skinType,
+      recommendedProducts: recommendations,
+    };
+
+    return this.saveAnalysis(analysisData);
+  }
+
+  async findByUserId(userId: string): Promise<AnalyseDocument[]> {
+    return this.analyseModel
+      .find({
+        userId: new Types.ObjectId(userId),
+      })
+      .sort({ analysisDate: -1 })
+      .exec();
+  }
+
+  async findOne(id: string): Promise<AnalyseDocument> {
+    const analysis = await this.analyseModel
+      .findById(id)
+      .populate({
+        path: 'recommendedProducts.productId',
+        select: 'productName price productImages',
+      })
+      .exec();
+
+    if (!analysis) {
+      throw new NotFoundException(`Analysis with ID ${id} not found`);
+    }
+
+    return analysis;
+  }
+
+  async update(id: string, updateAnalyseDto: UpdateAnalyseDto): Promise<AnalyseDocument> {
+    const analysis = await this.analyseModel.findById(id);
+
+    if (!analysis) {
+      throw new NotFoundException(`Analysis with ID ${id} not found`);
+    }
+
+    if (updateAnalyseDto.skinType) {
+      analysis.skinType = updateAnalyseDto.skinType;
+    }
+
+    if (updateAnalyseDto.recommendedProducts) {
+      analysis.recommendedProducts = updateAnalyseDto.recommendedProducts.map(rec => ({
+        ...rec,
+        productId: new Types.ObjectId(rec.productId),
+      }));
+    }
+
+    return analysis.save();
+  }
+
+  async remove(id: string): Promise<{ deleted: boolean }> {
+    const result = await this.analyseModel.deleteOne({ _id: id });
+
+    if (result.deletedCount === 0) {
+      throw new NotFoundException(`Analysis with ID ${id} not found`);
+    }
+
+    return { deleted: true };
   }
 }
