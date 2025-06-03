@@ -92,4 +92,51 @@ export class UsersController {
       return errorResponse(error.message, error.status || 400);
     }
   }
+
+  @Patch('profile')
+  @UseGuards(JwtAuthGuard)
+  async updateProfile(@Request() req, @Body() updateUserDto: UpdateUserDto) {
+    try {
+      const userId = req.user.sub || req.user.id || req.user.userId;
+
+      if (!userId) {
+        throw new BadRequestException('User ID not found in token');
+      }
+
+      this.logger.debug(`Updating profile for user: ${userId}`);
+      this.logger.debug(`Update details: ${JSON.stringify(updateUserDto)}`);
+
+      const sensitiveFields = [
+        'email',
+        'password',
+        'isVerified',
+        'isActive',
+        'role',
+        'skinAnalysisHistory',
+        'purchaseHistory',
+      ];
+      const requestBody = req.body;
+
+      const forbiddenFields = Object.keys(requestBody).filter((key) =>
+        sensitiveFields.includes(key),
+      );
+
+      if (forbiddenFields.length > 0) {
+        throw new BadRequestException(
+          `Cannot update sensitive fields: ${forbiddenFields.join(', ')}.`,
+        );
+      }
+
+      const updatedUser = await this.usersService.update(
+        userId.toString(),
+        updateUserDto,
+      );
+      const { password, ...result } = updatedUser.toObject();
+
+      return successResponse(result, 'Profile updated successfully');
+    } catch (error) {
+      this.logger.error(`Profile update failed: ${error.message}`);
+      return errorResponse(error.message, error.status || 400);
+    }
+  }
 }
