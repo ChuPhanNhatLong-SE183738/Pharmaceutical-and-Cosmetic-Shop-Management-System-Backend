@@ -15,6 +15,8 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { AnalyseModule } from './analyse/analyse.module';
 import { ShippingLogsModule } from './shipping_logs/shipping_logs.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
+import { ChatHistoryModule } from './chat_history/chat_history.module';
+import { ChatMessagesModule } from './chat_messages/chat_messages.module';
 
 @Module({
   imports: [
@@ -47,6 +49,8 @@ import { CloudinaryModule } from './cloudinary/cloudinary.module';
     AnalyseModule,
     ShippingLogsModule,
     CloudinaryModule,
+    ChatHistoryModule,
+    ChatMessagesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
