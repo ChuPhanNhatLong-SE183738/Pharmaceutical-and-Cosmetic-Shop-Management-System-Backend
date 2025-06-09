@@ -130,30 +130,28 @@ export class PaymentsService {
         let transaction;
         if (existingTransaction) {
           // Fix the type error by using explicit type conversion
-          const transactionId = existingTransaction._id instanceof Types.ObjectId 
-            ? existingTransaction._id.toString() 
-            : String(existingTransaction._id);
+          const transactionId =
+            existingTransaction._id instanceof Types.ObjectId
+              ? existingTransaction._id.toString()
+              : String(existingTransaction._id);
 
           // If transaction exists, update it to success
           transaction = await this.transactionsService.updateStatus(
             transactionId,
             'success',
           );
-          
+
           // Update the paymentDetails with VNPay response data
-          transaction = await this.transactionsService.update(
-            transactionId,
-            {
-              paymentDetails: {
-                ...existingTransaction.paymentDetails,
-                bankCode: query.vnp_BankCode,
-                cardType: query.vnp_CardType,
-                transactionNo: query.vnp_TransactionNo,
-                payDate: query.vnp_PayDate,
-                responseCode: query.vnp_ResponseCode,
-              },
+          transaction = await this.transactionsService.update(transactionId, {
+            paymentDetails: {
+              ...existingTransaction.paymentDetails,
+              bankCode: query.vnp_BankCode,
+              cardType: query.vnp_CardType,
+              transactionNo: query.vnp_TransactionNo,
+              payDate: query.vnp_PayDate,
+              responseCode: query.vnp_ResponseCode,
             },
-          );
+          });
         } else {
           // If no transaction exists, create a new one
           transaction = await this.transactionsService.create({
@@ -199,9 +197,10 @@ export class PaymentsService {
         }
 
         // Use explicit type conversion for createdOrder._id
-        const orderIdString = createdOrder?._id instanceof Types.ObjectId
-          ? createdOrder._id.toString()
-          : String(createdOrder._id || '');
+        const orderIdString =
+          createdOrder?._id instanceof Types.ObjectId
+            ? createdOrder._id.toString()
+            : String(createdOrder._id || '');
 
         this.logger.debug('Order created:', orderIdString);
 
