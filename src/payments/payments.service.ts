@@ -41,7 +41,7 @@ export class PaymentsService {
     const orderInfo = `order_${orderReference}_user_${validatedUserId}`;
 
     // Round the total price to a whole number and multiply by 100 for VND
-    const amountInVnd = Math.round(cart.totalPrice * 100);
+    const amountInVnd = Math.round(cart.totalPrice);
 
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
