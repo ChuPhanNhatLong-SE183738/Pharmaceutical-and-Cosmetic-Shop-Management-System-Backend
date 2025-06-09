@@ -30,14 +30,17 @@ export class ProductsService {
       minPrice,
       maxPrice,
       search,
+      sortPrice,
     } = query || {};
 
     const filter: any = {};
 
-    if (category)
+    if (category) {
       filter.category = {
         $in: Array.isArray(category) ? category : [category],
       };
+    }
+
     if (brand) filter.brand = brand;
     if (minPrice || maxPrice) {
       filter.price = {};
@@ -48,16 +51,26 @@ export class ProductsService {
       filter.$or = [
         { productName: { $regex: search, $options: 'i' } },
         { productDescription: { $regex: search, $options: 'i' } },
+        { brand: { $regex: search, $options: 'i' } },
       ];
     }
 
     const skip = (Number(page) - 1) * Number(limit);
-    const sortOrder = order === 'desc' ? -1 : 1;
+
+    let sortOptions: any = {};
+    if (sortPrice === 'asc') {
+      sortOptions.price = 1;
+    } else if (sortPrice === 'desc') {
+      sortOptions.price = -1;
+    } else {
+      const sortOrder = order === 'desc' ? -1 : 1;
+      sortOptions[sortBy] = sortOrder;
+    }
 
     const products = await this.productModel
       .find(filter)
       .populate('category')
-      .sort({ [sortBy]: sortOrder })
+      .sort(sortOptions)
       .skip(skip)
       .limit(Number(limit))
       .exec();
@@ -152,7 +165,11 @@ export class ProductsService {
     return updatedProduct;
   }
 
-   async updateRating(productId: string, averageRating: number, reviewCount: number): Promise<void> {
+  async updateRating(
+    productId: string,
+    averageRating: number,
+    reviewCount: number,
+  ): Promise<void> {
     await this.productModel.findByIdAndUpdate(
       productId,
       {
@@ -161,7 +178,7 @@ export class ProductsService {
           reviewCount,
         },
       },
-      { new: true }
+      { new: true },
     );
   }
 }
