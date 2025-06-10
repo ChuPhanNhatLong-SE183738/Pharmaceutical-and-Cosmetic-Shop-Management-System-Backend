@@ -107,7 +107,7 @@ export class ProductsController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.STAFF)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a product', description: 'Updates a product with the provided details' })
   @ApiParam({ name: 'id', description: 'Product ID' })
