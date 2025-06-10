@@ -188,17 +188,17 @@ export class OrdersService {
         }
       }
 
-      // Clear the cart
-      try {
-        const userObjectId = new Types.ObjectId(data.userId);
-        await this.cartService.clearCart(userObjectId);
-        this.logger.debug('Cart cleared successfully');
-      } catch (cartError) {
-        this.logger.error(
-          `Failed to clear cart: ${cartError.message}`,
-          cartError.stack,
-        );
-      }
+      // // Clear the cart
+      // try {
+      //   const userObjectId = new Types.ObjectId(data.userId);
+      //   await this.cartService.clearCart(userObjectId);
+      //   this.logger.debug('Cart cleared successfully');
+      // } catch (cartError) {
+      //   this.logger.error(
+      //     `Failed to clear cart: ${cartError.message}`,
+      //     cartError.stack,
+      //   );
+      // }
 
       // Return the complete order with items
       const orderId = savedOrder._id as Types.ObjectId;
