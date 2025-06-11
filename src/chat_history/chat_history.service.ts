@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { ChatHistory, ChatHistoryDocument } from './entities/chat_history.entity';
@@ -39,5 +39,23 @@ export class ChatHistoryService {
       .find({ userId: new Types.ObjectId(userId) })
       .populate('messages')
       .exec();
+  }
+
+  async removeChatHistory(id: string): Promise<{deleted: boolean}> {
+    try {
+      const chatHistory = await this.chatHistoryModel.findById(id)
+
+      if (!chatHistory) {
+        throw new NotFoundException(`Chat history with id ${id} not found`);
+      }
+
+      await this.chatMessageModel.deleteMany({chatId: new Types.ObjectId(id)})
+
+      await this.chatHistoryModel.findByIdAndDelete(id)
+
+      return {deleted: true}
+    } catch (error) {
+      throw new Error(`Failed to delete chat history: ${error.message}`);
+    }
   }
 }
