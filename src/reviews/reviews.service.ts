@@ -21,10 +21,8 @@ export class ReviewsService {
 
   async create(createReviewDto: CreateReviewDto): Promise<ReviewDocument> {
     try {
-      // Verify product exists
       const product = await this.productsService.findOne(createReviewDto.productId);
       
-      // Check if user already reviewed this product
       const existingReview = await this.reviewModel.findOne({
         productId: new Types.ObjectId(createReviewDto.productId),
         userId: new Types.ObjectId(createReviewDto.userId),
@@ -34,7 +32,6 @@ export class ReviewsService {
         throw new BadRequestException('You have already reviewed this product');
       }
       
-      // Check if the user has purchased this product
       const hasPurchased = await this.verifyUserPurchasedProduct(
         createReviewDto.userId,
         createReviewDto.productId
@@ -53,7 +50,6 @@ export class ReviewsService {
       
       const savedReview = await newReview.save();
       
-      // Add review reference to the product's reviews array
       await this.productModel.findByIdAndUpdate(
         createReviewDto.productId,
         { $push: { reviews: savedReview._id } },
@@ -62,7 +58,6 @@ export class ReviewsService {
       
       this.logger.debug(`Added review ${savedReview._id} to product ${createReviewDto.productId}`);
       
-      // Update product's average rating
       await this.updateProductAverageRating(createReviewDto.productId);
       
       return savedReview;
