@@ -108,7 +108,7 @@ export class InventoryLogsService {
         }
         
         inventoryLog.status = 'denied';
-        inventoryLog['rejectionReason'] = reviewDto.reason;
+        inventoryLog.reason = reviewDto.reason;
         return await inventoryLog.save();
       }
       
@@ -168,6 +168,7 @@ export class InventoryLogsService {
       .populate('products.productId', 'productName price')
       .populate('userId', 'fullName email')
       .sort({ createdAt: -1 })
+      .select('-__v +reason')
       .exec();
   }
 
@@ -180,6 +181,7 @@ async getInventoryLogsByProduct(productId: string): Promise<InventoryLogDocument
     .populate('products.productId', 'productName price')
     .populate('userId', 'fullName email')
     .sort({ createdAt: -1 })
+    .select('-__v +reason')
     .exec();
 }
 
@@ -187,6 +189,7 @@ async getInventoryLogsByProduct(productId: string): Promise<InventoryLogDocument
     return this.inventoryLogModel.find({ userId: new Types.ObjectId(userId) })
       .populate('products.productId', 'productName price')
       .sort({ createdAt: -1 })
+      .select('-__v +reason') 
       .exec();
   }
 }
