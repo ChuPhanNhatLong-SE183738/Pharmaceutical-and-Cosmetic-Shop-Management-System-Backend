@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import * as ort from 'onnxruntime-node';
@@ -27,7 +32,15 @@ export class AnalyseService {
     private productsService: ProductsService,
   ) {
     this.modelPath = path.join(process.cwd(), 'public', 'model.onnx');
-    this.labels = ['oily', 'dry', 'normal'];
+    this.labels = [
+      'Acne',
+      'Blackheads',
+      'Dark Spots',
+      'Dry Skin',
+      'Normal Skin',
+      'Oily Skin',
+      'Wrinkles',
+    ];
     this.initModel();
   }
 
@@ -80,23 +93,28 @@ export class AnalyseService {
     };
   }
 
-  async saveAnalysis(createAnalyseDto: CreateAnalyseDto): Promise<AnalyseDocument> {
+  async saveAnalysis(
+    createAnalyseDto: CreateAnalyseDto,
+  ): Promise<AnalyseDocument> {
     try {
       const newAnalysis = new this.analyseModel({
         userId: new Types.ObjectId(createAnalyseDto.userId),
         imageUrl: createAnalyseDto.imageUrl,
         skinType: createAnalyseDto.skinType,
         analysisDate: new Date(),
-        recommendedProducts: createAnalyseDto.recommendedProducts?.map(rec => ({
-          ...rec,
-          productId: new Types.ObjectId(rec.productId),
-        })) || [],
+        recommendedProducts:
+          createAnalyseDto.recommendedProducts?.map((rec) => ({
+            ...rec,
+            productId: new Types.ObjectId(rec.productId),
+          })) || [],
       });
 
       return await newAnalysis.save();
     } catch (error) {
       this.logger.error(`Error saving analysis: ${error.message}`);
-      throw new BadRequestException(`Failed to save analysis: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to save analysis: ${error.message}`,
+      );
     }
   }
 
@@ -162,7 +180,10 @@ export class AnalyseService {
     return analysis;
   }
 
-  async update(id: string, updateAnalyseDto: UpdateAnalyseDto): Promise<AnalyseDocument> {
+  async update(
+    id: string,
+    updateAnalyseDto: UpdateAnalyseDto,
+  ): Promise<AnalyseDocument> {
     const analysis = await this.analyseModel.findById(id);
 
     if (!analysis) {
@@ -174,10 +195,12 @@ export class AnalyseService {
     }
 
     if (updateAnalyseDto.recommendedProducts) {
-      analysis.recommendedProducts = updateAnalyseDto.recommendedProducts.map(rec => ({
-        ...rec,
-        productId: new Types.ObjectId(rec.productId),
-      }));
+      analysis.recommendedProducts = updateAnalyseDto.recommendedProducts.map(
+        (rec) => ({
+          ...rec,
+          productId: new Types.ObjectId(rec.productId),
+        }),
+      );
     }
 
     return analysis.save();
