@@ -53,5 +53,39 @@ export class TransactionsService {
     }
 
     return transaction;
+    
+  }
+  async getRevenue(
+    startDate?: Date, 
+    endDate?: Date,
+  ): Promise<{ totalRevenue: number; transactionCount: number }> {
+    this.logger.log(`Calculating revenue from ${startDate} to ${endDate}`);
+    
+    const query: any = { 
+      status: 'success' 
+    };
+    
+    if (startDate || endDate) {
+      query['createdAt'] = {};
+      
+      if (startDate) {
+        query['createdAt']['$gte'] = startDate;
+      }
+      
+      if (endDate) {
+        query['createdAt']['$lte'] = endDate;
+      }
+    }
+    
+    const transactions = await this.transactionModel.find(query).exec();
+    
+    const totalRevenue = transactions.reduce(
+      (sum, transaction) => sum + transaction.totalAmount, 
+      0
+    );
+    return {
+      totalRevenue,
+      transactionCount: transactions.length,
+    };
   }
 }
