@@ -14,6 +14,7 @@ import {
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
+import { RefundOrderDto } from './dto/refund-order.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -142,6 +143,46 @@ export class OrdersController {
       return successResponse(order, message);
     } catch (error) {
       return errorResponse(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  // API để admin/staff refund đơn hàng đã bị reject
+  @Patch(':id/refund')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  // @Roles('admin', 'staff')
+  @ApiOperation({ summary: 'Refund a rejected order' })
+  @ApiResponse({
+    status: 200,
+    description: 'Order has been successfully refunded',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Order cannot be refunded (not in rejected status)',
+  })
+  @ApiBearerAuth()
+  async refundOrder(
+    @Param('id') id: string,
+    @Body() refundData: RefundOrderDto,
+    @Request() req,
+  ) {
+    try {
+      // Lấy userId của admin/staff từ JWT token
+      const processedBy = req.user.userId || req.user.sub;
+
+      const order = await this.ordersService.refundOrder(id, {
+        ...refundData,
+        processedBy,
+      });
+
+      let message = 'Order has been refunded successfully';
+      if (refundData.refundReason) {
+        message += ` (Reason: ${refundData.refundReason})`;
+      }
+
+      return successResponse(order, message);
+    } catch (error) {
+      const statusCode = error.status || HttpStatus.BAD_REQUEST;
+      return errorResponse(error.message, statusCode);
     }
   }
 

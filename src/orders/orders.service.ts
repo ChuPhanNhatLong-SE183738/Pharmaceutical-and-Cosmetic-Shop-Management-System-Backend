@@ -38,7 +38,9 @@ export class OrdersService {
   ) {
     // We'll resolve the ShippingLogsService after initialization to avoid circular dependencies
     setTimeout(() => {
-      this.shippingLogsService = this.moduleRef.get(ShippingLogsService, { strict: false });
+      this.shippingLogsService = this.moduleRef.get(ShippingLogsService, {
+        strict: false,
+      });
     }, 0);
   }
 
@@ -300,31 +302,44 @@ export class OrdersService {
       }
 
       const updatedOrder = await order.save();
-      this.logger.debug(`Order ${id} has been ${data.status} by ${data.processedBy}`);
+      this.logger.debug(
+        `Order ${id} has been ${data.status} by ${data.processedBy}`,
+      );
 
       // Create shipping log if order is approved
       if (data.status === 'approved') {
         try {
           // Make sure shippingLogsService is initialized
           if (!this.shippingLogsService) {
-            this.shippingLogsService = this.moduleRef.get(ShippingLogsService, { strict: false });
+            this.shippingLogsService = this.moduleRef.get(ShippingLogsService, {
+              strict: false,
+            });
           }
-          
-          const createdLog = await this.shippingLogsService.createFromApprovedOrder(
-            id, 
-            order.totalAmount
+
+          const createdLog =
+            await this.shippingLogsService.createFromApprovedOrder(
+              id,
+              order.totalAmount,
+            );
+
+          this.logger.debug(
+            `Created shipping log for order ${id}: ${createdLog._id}`,
           );
-          
-          this.logger.debug(`Created shipping log for order ${id}: ${createdLog._id}`);
         } catch (error) {
-          this.logger.error(`Failed to create shipping log: ${error.message}`, error.stack);
+          this.logger.error(
+            `Failed to create shipping log: ${error.message}`,
+            error.stack,
+          );
           // Continue execution even if shipping log creation fails
         }
       }
 
       return this.findOne(id);
     } catch (error) {
-      this.logger.error(`Error processing order: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error processing order: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -454,6 +469,59 @@ export class OrdersService {
       return ordersWithItems;
     } catch (error) {
       this.logger.error(`Error finding orders by user ID: ${error.message}`);
+      throw error;
+    }
+  }
+
+  async refundOrder(
+    id: string,
+    data: {
+      refundReason?: string;
+      note?: string;
+      processedBy: string;
+    },
+  ) {
+    try {
+      const order = await this.ordersModel.findById(id);
+      if (!order) {
+        throw new NotFoundException(`Order with ID ${id} not found`);
+      }
+
+      // Validate that order can only be refunded if it was previously rejected
+      if (order.status !== 'rejected') {
+        throw new ConflictException(
+          `Order can only be refunded if it was previously rejected. Current status: ${order.status}`,
+        );
+      }
+
+      // Update order status to refunded
+      order.status = 'refunded';
+
+      // Save refund reason if provided
+      if (data.refundReason) {
+        order.set('refundReason', data.refundReason);
+      }
+
+      // Update or append to notes
+      if (data.note) {
+        const existingNotes = order.notes || '';
+        const refundNote = `[REFUND] ${data.note}`;
+        order.notes = existingNotes
+          ? `${existingNotes}\n${refundNote}`
+          : refundNote;
+      }
+
+      // Update processor information
+      if (data.processedBy) {
+        order.set('processedBy', new Types.ObjectId(data.processedBy));
+      }
+
+      const updatedOrder = await order.save();
+      this.logger.debug(`Order ${id} has been refunded by ${data.processedBy}`);
+
+      return this.findOne(id);
+    } catch (error) {
+      this.logger.error(`Error refunding order: ${error.message}`, error.stack);
       throw error;
     }
   }

@@ -50,6 +50,7 @@ export class Orders {
       'shipping',
       'delivered',
       'canceled',
+      'refunded',
     ],
   })
   status: string;
@@ -68,6 +69,9 @@ export class Orders {
 
   @Prop()
   rejectionReason: string;
+
+  @Prop()
+  refundReason: string;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: () => User })
   processedBy: Types.ObjectId;
