@@ -149,7 +149,7 @@ export class OrdersController {
   // API để admin/staff refund đơn hàng đã bị reject
   @Patch(':id/refund')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  // @Roles('admin', 'staff')
+  @Roles('admin', 'staff')
   @ApiOperation({ summary: 'Refund a rejected order' })
   @ApiResponse({
     status: 200,
