@@ -31,7 +31,7 @@ export class AnalyseService {
     @InjectModel(Analyse.name) private analyseModel: Model<AnalyseDocument>,
     private productsService: ProductsService,
   ) {
-    this.modelPath = path.join(process.cwd(), 'public', 'model.onnx');
+    this.modelPath = path.join(process.cwd(), 'src', 'data_model','model.onnx');
     this.labels = [
       'Acne',
       'Blackheads',
