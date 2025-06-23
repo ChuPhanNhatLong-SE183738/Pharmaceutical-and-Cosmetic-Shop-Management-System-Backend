@@ -172,6 +172,7 @@ export class AuthService {
         email: userObject.email,
         fullName: userObject.fullName,
         role: userObject.role,
+        photoUrl: userObject.photoUrl || null,
         phone: userObject.phone || null,
         address: userObject.address || null,
         dob: userObject.dob || null,
