@@ -159,14 +159,16 @@ export class ReviewsController {
     status: 403,
     description: 'Forbidden - Only the review author can update the review',
   })
-  @ApiResponse({ status: 404, description: 'Review not found' })
-  async update(
+  @ApiResponse({ status: 404, description: 'Review not found' })  async update(
     @Param('id') id: string,
     @Body() updateReviewDto: UpdateReviewDto,
     @Req() req,
   ) {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user.userId || req.user.sub || req.user._id;
+      this.logger.debug(`Update request - User object: ${JSON.stringify(req.user)}`);
+      this.logger.debug(`Update request - Extracted userId: ${userId}`);
+      
       const updatedReview = await this.reviewsService.update(
         id,
         updateReviewDto,
@@ -197,10 +199,12 @@ export class ReviewsController {
     description: 'Forbidden - Only the review author can delete the review',
   })
   @ApiResponse({ status: 404, description: 'Review not found' })
-  @ApiResponse({ status: 500, description: 'Internal server error' })
-  async remove(@Param('id') id: string, @Req() req) {
+  @ApiResponse({ status: 500, description: 'Internal server error' })  async remove(@Param('id') id: string, @Req() req) {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user.userId || req.user.sub || req.user._id;
+      this.logger.debug(`Delete request - User object: ${JSON.stringify(req.user)}`);
+      this.logger.debug(`Delete request - Extracted userId: ${userId}`);
+      
       const deletedReview = await this.reviewsService.remove(id, userId);
       if (!deletedReview) {
         return errorResponse('Review not found', HttpStatus.NOT_FOUND);
