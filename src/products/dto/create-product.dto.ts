@@ -58,9 +58,4 @@ export class CreateProductDto {
   @Min(0)
   @Max(100)
   salePercentage: number;
-
-  @IsOptional()
-  @IsDate()
-  @Type(() => Date)
-  expiryDate: Date;
 }

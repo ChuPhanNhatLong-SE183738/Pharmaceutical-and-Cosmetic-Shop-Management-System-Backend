@@ -2,25 +2,33 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { IsNotEmpty, IsOptional } from 'class-validator';
 import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 
-export interface ProductQuantity {
-  productId: string;
+@Schema({ timestamps: true })
+export class InventoryLogItems {
+  @Prop({ type: MongooseSchema.ObjectId, ref: 'InventoryLog', required: true })
+  @IsNotEmpty()
+  inventoryLogId: Types.ObjectId;
+
+  @Prop({ type: MongooseSchema.ObjectId, ref: 'Product', required: true })
+  @IsNotEmpty()
+  productId: Types.ObjectId;
+
+  @Prop({ required: true })
+  @IsNotEmpty()
   quantity: number;
+
+  @Prop({ required: true })
+  @IsNotEmpty()
+  expirtyDate: Date;
 }
+
+export type InventoryLogItemsDocument = InventoryLogItems & Document;
+export const InventoryLogItemsSchema = SchemaFactory.createForClass(InventoryLogItems);
 
 @Schema({ timestamps: true })
 export class InventoryLog {
     @Prop({ required: true })
     @IsNotEmpty()
     batch: string;
-
-    @Prop({ 
-      type: [{ 
-        productId: { type: MongooseSchema.Types.ObjectId, ref: 'Product' },
-        quantity: { type: Number, required: true }
-      }], 
-      required: true 
-    })
-    products: ProductQuantity[];
 
     @Prop({ required: true, enum: ['import', 'export'] })
     @IsNotEmpty()

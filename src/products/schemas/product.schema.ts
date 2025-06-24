@@ -75,10 +75,6 @@ export class Product {
 
   @Prop({ type: Number, default: null })
   salePercentage: number | null;
-
-  @IsDateString()
-  @Prop({ required: true })
-  expiryDate: Date;
 }
 
 const ProductSchema = SchemaFactory.createForClass(Product);

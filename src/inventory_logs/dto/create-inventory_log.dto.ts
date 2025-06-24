@@ -1,33 +1,94 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsEnum, IsMongoId, IsNotEmpty, IsNumber, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsEnum,
+  IsMongoId,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+  ValidateNested,
+  IsDateString,
+} from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 
-export class ProductQuantityDto {
-    @IsNotEmpty()
-    @IsMongoId()
-    productId: string;
+export class InventoryLogItemDto {
+  @ApiProperty({
+    description: 'Product ID (MongoDB ObjectId)',
+    example: '6123456789abcdef12345678',
+  })
+  @IsNotEmpty()
+  @IsMongoId()
+  productId: string;
 
-    @IsNotEmpty()
-    @IsNumber()
-    @Min(1)
-    quantity: number;
+  @ApiProperty({
+    description: 'Quantity of the product to import/export',
+    example: 50,
+    minimum: 1,
+  })
+  @IsNotEmpty()
+  @IsNumber()
+  @Min(1)
+  quantity: number;
+
+  @ApiProperty({
+    description: 'Expiry date of the product (ISO format)',
+    example: '2025-12-31T23:59:59.000Z',
+  })
+  @IsNotEmpty()
+  @IsDateString()
+  expirtyDate: string;
 }
 
 export class CreateInventoryLogDto {
-    @IsNotEmpty()
-    @IsString()
-    batch: string;
+  @ApiProperty({
+    description: 'Batch identifier for the inventory operation',
+    example: 'BATCH-2025-001',
+  })
+  @IsNotEmpty()
+  @IsString()
+  batch: string;
 
-    @IsArray()
-    @ValidateNested({ each: true })
-    @Type(() => ProductQuantityDto)
-    products: ProductQuantityDto[];
+  @ApiProperty({
+    description:
+      'List of products with quantities and expiry dates for this inventory operation',
+    type: [InventoryLogItemDto],
+    example: [
+      {
+        productId: '6123456789abcdef12345678',
+        quantity: 50,
+        expirtyDate: '2025-12-31T23:59:59.000Z',
+      },
+      {
+        productId: '6123456789abcdef87654321',
+        quantity: 25,
+        expirtyDate: '2026-01-15T23:59:59.000Z',
+      },
+    ],
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => InventoryLogItemDto)
+  products: InventoryLogItemDto[];
 
-    @IsNotEmpty()
-    @IsString()
-    @IsEnum(['import', 'export'])
-    action: string;
+  @ApiProperty({
+    description: 'Type of inventory operation',
+    enum: ['import', 'export'],
+    example: 'import',
+  })
+  @IsNotEmpty()
+  @IsString()
+  @IsEnum(['import', 'export'])
+  action: string;
 
-    @IsNotEmpty()
-    @IsString()
-    userId: string;
+  @ApiProperty({
+    description:
+      'User ID who created the inventory log (will be set automatically from JWT token)',
+    example: '6123456789abcdef11111111',
+  })
+  @IsNotEmpty()
+  @IsString()
+  @IsMongoId()
+  userId: string;
 }
