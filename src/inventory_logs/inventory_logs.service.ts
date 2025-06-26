@@ -166,7 +166,15 @@ export class InventoryLogsService {
     reviewDto: ReviewInventoryLogDto,
   ): Promise<InventoryLogDocument> {
     try {
-      const inventoryLog = await this.findOne(id);
+      // First, get the inventory log as a proper Mongoose document
+      const inventoryLog = await this.inventoryLogModel
+        .findById(id)
+        .populate('userId', 'fullName email')
+        .exec();
+
+      if (!inventoryLog) {
+        throw new NotFoundException(`Inventory log with ID ${id} not found`);
+      }
 
       if (inventoryLog.status !== 'pending') {
         throw new BadRequestException(
