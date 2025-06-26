@@ -50,6 +50,7 @@ export class InventoryLogsService {
           productId: new Types.ObjectId(product.productId),
           quantity: product.quantity,
           expirtyDate: new Date(product.expirtyDate),
+          price: product.price,
         }),
       );
 
@@ -68,7 +69,7 @@ export class InventoryLogsService {
   }
   async findAll(
     filterDto?: InventoryLogFilterDto,
-  ): Promise<{ logs: InventoryLogDocument[]; total: number }> {
+  ): Promise<{ logs: any[]; total: number }> {
     try {
       const query: any = {};
       if (filterDto) {
@@ -105,9 +106,24 @@ export class InventoryLogsService {
         .sort({ createdAt: -1 })
         .exec();
 
+      // Populate inventory log items for each log
+      const logsWithItems = await Promise.all(
+        logs.map(async (log) => {
+          const inventoryLogItems = await this.inventoryLogItemsModel
+            .find({ inventoryLogId: log._id })
+            .populate('productId', 'productName price stock')
+            .exec();
+
+          return {
+            ...log.toObject(),
+            items: inventoryLogItems,
+          };
+        }),
+      );
+
       const total = await this.inventoryLogModel.countDocuments(query);
 
-      return { logs, total };
+      return { logs: logsWithItems, total };
     } catch (error) {
       this.logger.error(`Error finding inventory logs: ${error.message}`);
       throw new BadRequestException(
@@ -115,7 +131,7 @@ export class InventoryLogsService {
       );
     }
   }
-  async findOne(id: string): Promise<InventoryLogDocument> {
+  async findOne(id: string): Promise<any> {
     try {
       const inventoryLog = await this.inventoryLogModel
         .findById(id)
@@ -126,7 +142,15 @@ export class InventoryLogsService {
         throw new NotFoundException(`Inventory log with ID ${id} not found`);
       }
 
-      return inventoryLog;
+      const inventoryLogItems = await this.inventoryLogItemsModel
+        .find({ inventoryLogId: inventoryLog._id })
+        .populate('productId', 'productName price stock')
+        .exec();
+
+      return {
+        ...inventoryLog.toObject(),
+        items: inventoryLogItems,
+      };
     } catch (error) {
       this.logger.error(`Error finding inventory log: ${error.message}`);
       if (error instanceof NotFoundException) {
@@ -407,6 +431,7 @@ export class InventoryLogsService {
                 itemId: item._id,
                 quantity: item.quantity,
                 expirtyDate: item.expirtyDate,
+                price: item.price,
                 inventoryLogId: item.inventoryLogId,
               })),
             };
@@ -501,6 +526,7 @@ export class InventoryLogsService {
           productName: productInfo.productName,
           quantity: item.quantity,
           expirtyDate: item.expirtyDate,
+          price: item.price,
           daysPastExpiry: Math.floor(
             (currentDate.getTime() - item.expirtyDate.getTime()) /
               (1000 * 60 * 60 * 24),

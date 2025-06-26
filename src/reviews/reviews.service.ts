@@ -154,7 +154,7 @@ export class ReviewsService {
 
       return this.reviewModel
         .find(query)
-        .populate('userId', 'fullName email')
+        .populate('userId', 'fullName email photoUrl')
         .populate('productId', 'productName price')
         .sort({ createdAt: -1 })
         .exec();
@@ -170,7 +170,7 @@ export class ReviewsService {
     try {
       const review = await this.reviewModel
         .findById(id)
-        .populate('userId', 'fullName email')
+        .populate('userId', 'fullName email photoUrl')
         .populate('productId', 'productName price')
         .exec();
 

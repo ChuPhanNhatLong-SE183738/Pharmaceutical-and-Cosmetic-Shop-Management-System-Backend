@@ -165,6 +165,35 @@ export class InventoryLogsController {
                     },
                   },
                   reason: { type: 'string' },
+                  items: {
+                    type: 'array',
+                    description: 'Inventory log items with product details',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        _id: { type: 'string' },
+                        inventoryLogId: { type: 'string' },
+                        productId: {
+                          type: 'object',
+                          properties: {
+                            _id: { type: 'string' },
+                            productName: { type: 'string' },
+                            price: {
+                              type: 'number',
+                              description: 'Current product price',
+                            },
+                            stock: { type: 'number' },
+                          },
+                        },
+                        quantity: { type: 'number' },
+                        expirtyDate: { type: 'string', format: 'date-time' },
+                        price: {
+                          type: 'number',
+                          description: 'Price at time of import',
+                        },
+                      },
+                    },
+                  },
                   createdAt: { type: 'string', format: 'date-time' },
                   updatedAt: { type: 'string', format: 'date-time' },
                 },
@@ -305,6 +334,35 @@ export class InventoryLogsController {
               },
             },
             reason: { type: 'string' },
+            items: {
+              type: 'array',
+              description: 'Inventory log items with product details',
+              items: {
+                type: 'object',
+                properties: {
+                  _id: { type: 'string' },
+                  inventoryLogId: { type: 'string' },
+                  productId: {
+                    type: 'object',
+                    properties: {
+                      _id: { type: 'string' },
+                      productName: { type: 'string' },
+                      price: {
+                        type: 'number',
+                        description: 'Current product price',
+                      },
+                      stock: { type: 'number' },
+                    },
+                  },
+                  quantity: { type: 'number' },
+                  expirtyDate: { type: 'string', format: 'date-time' },
+                  price: {
+                    type: 'number',
+                    description: 'Price at time of import',
+                  },
+                },
+              },
+            },
             createdAt: { type: 'string', format: 'date-time' },
             updatedAt: { type: 'string', format: 'date-time' },
           },
@@ -502,6 +560,10 @@ export class InventoryLogsController {
                         itemId: { type: 'string' },
                         quantity: { type: 'number' },
                         expirtyDate: { type: 'string', format: 'date-time' },
+                        price: {
+                          type: 'number',
+                          description: 'Price at time of import',
+                        },
                         inventoryLogId: { type: 'string' },
                       },
                     },
@@ -585,6 +647,7 @@ export class InventoryLogsController {
               productName: { type: 'string' },
               quantity: { type: 'number' },
               expirtyDate: { type: 'string', format: 'date-time' },
+              price: { type: 'number', description: 'Price at time of import' },
               daysPastExpiry: { type: 'number' },
               inventoryLogInfo: {
                 type: 'object',
@@ -692,13 +755,18 @@ export class InventoryLogsController {
   @ApiForbiddenResponse({ description: 'User does not have required roles' })
   async triggerManualExpiredProductsProcessing() {
     try {
-      this.logger.debug('Manual expired products processing triggered by admin');
+      this.logger.debug(
+        'Manual expired products processing triggered by admin',
+      );
 
-      const result = await this.inventoryLogsService.triggerManualExpiredProductsProcessing();
+      const result =
+        await this.inventoryLogsService.triggerManualExpiredProductsProcessing();
 
       return successResponse(
         result,
-        result.success ? result.message : 'Manual processing completed with errors',
+        result.success
+          ? result.message
+          : 'Manual processing completed with errors',
       );
     } catch (error) {
       this.logger.error(

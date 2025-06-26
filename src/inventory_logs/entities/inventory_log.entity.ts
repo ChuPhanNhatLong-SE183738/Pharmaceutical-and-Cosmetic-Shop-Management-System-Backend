@@ -19,6 +19,10 @@ export class InventoryLogItems {
   @Prop({ required: true })
   @IsNotEmpty()
   expirtyDate: Date;
+  
+  @Prop({ required: true })
+  @IsNotEmpty()
+  price: number;
 }
 
 export type InventoryLogItemsDocument = InventoryLogItems & Document;
