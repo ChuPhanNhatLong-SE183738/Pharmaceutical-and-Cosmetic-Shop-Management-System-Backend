@@ -525,4 +525,201 @@ export class OrdersService {
       throw error;
     }
   }
+
+  async createOrderFromSelectedCartItems(data: {
+    userId: string;
+    cartId: string;
+    transactionId: string;
+    status: string;
+    selectedProductIds: string[];
+  }) {
+    this.logger.debug('Creating order from selected cart items:', data);
+
+    try {
+      const cart = await this.cartService.findOne(data.cartId);
+
+      if (!cart) {
+        throw new NotFoundException(`Cart with ID ${data.cartId} not found`);
+      }
+
+      // Get populated cart with product details
+      const populatedCart = await this.cartService.findOneWithPopulatedItems(
+        data.cartId,
+      );
+      if (!populatedCart) {
+        throw new Error('Failed to get cart items with product details');
+      }
+
+      this.logger.debug('Cart found:', JSON.stringify(populatedCart, null, 2));
+
+      const user = await this.usersService.findById(data.userId);
+
+      // Filter cart items based on selected product IDs - Fix the comparison logic
+      const selectedItems = populatedCart.items.filter((item) => {
+        // Handle different possible formats of productId
+        let productId: string;
+
+        if (typeof item.productId === 'string') {
+          productId = item.productId;
+        } else if (item.productId instanceof Types.ObjectId) {
+          productId = item.productId.toString();
+        } else if (item.productId && typeof item.productId === 'object') {
+          // This is a populated product object
+          productId =
+            (item.productId as any).id ||
+            (item.productId as any)._id?.toString() ||
+            item.productId.toString();
+        } else {
+          productId = String(item.productId);
+        }
+
+        this.logger.debug(
+          `Checking product ${productId} against selected IDs:`,
+          data.selectedProductIds,
+        );
+
+        return data.selectedProductIds.includes(productId);
+      });
+
+      this.logger.debug(
+        `Found ${selectedItems.length} selected items out of ${populatedCart.items.length} total items`,
+      );
+
+      if (selectedItems.length === 0) {
+        this.logger.error(
+          'No valid selected items found. Selected IDs:',
+          data.selectedProductIds,
+        );
+        this.logger.error(
+          'Available product IDs in cart:',
+          populatedCart.items.map((item) => {
+            if (typeof item.productId === 'string') {
+              return item.productId;
+            } else if (item.productId instanceof Types.ObjectId) {
+              return item.productId.toString();
+            } else if (item.productId && typeof item.productId === 'object') {
+              return (
+                (item.productId as any).id ||
+                (item.productId as any)._id?.toString() ||
+                item.productId.toString()
+              );
+            } else {
+              return String(item.productId);
+            }
+          }),
+        );
+        throw new Error('No valid selected items found in cart');
+      }
+
+      // Calculate total from selected items only
+      const totalAmount = selectedItems.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0,
+      );
+
+      // Create the order first
+      const newOrder = new this.ordersModel({
+        userId: new Types.ObjectId(data.userId),
+        transactionId: new Types.ObjectId(data.transactionId),
+        status: data.status,
+        totalAmount: totalAmount,
+        shippingAddress: user?.address || '',
+        contactPhone: user?.phone || '',
+      });
+
+      const savedOrder = await newOrder.save();
+      this.logger.debug('Order created:', JSON.stringify(savedOrder, null, 2));
+
+      // Create order items for selected cart items only
+      if (selectedItems.length > 0) {
+        const orderItemsData = selectedItems.map((item) => {
+          const product = item.productId as any;
+
+          this.logger.debug(
+            'Processing selected product:',
+            JSON.stringify(product, null, 2),
+          );
+
+          // Extract product data safely with proper field names
+          let productData: {
+            id: string;
+            name: string;
+            image: string;
+            price: number;
+          };
+
+          if (typeof product === 'string') {
+            // If productId is just a string, we need to handle it differently
+            productData = {
+              id: product,
+              name: `Product ${product}`,
+              image: '',
+              price: item.price || 0,
+            };
+          } else if (product instanceof Types.ObjectId) {
+            // If productId is an ObjectId
+            productData = {
+              id: product.toString(),
+              name: `Product ${product.toString()}`,
+              image: '',
+              price: item.price || 0,
+            };
+          } else {
+            // If productId is a populated product object
+            productData = {
+              id: product.id || product._id?.toString() || product.toString(),
+              name:
+                product.productName || `Product ${product.id || product._id}`,
+              image: product.productImages?.[0] || product.image || '',
+              price: item.price || product.price || 0,
+            };
+          }
+
+          return {
+            orderId: savedOrder._id,
+            productId: new Types.ObjectId(productData.id),
+            quantity: item.quantity,
+            price: productData.price,
+            productName: productData.name,
+            productImage: productData.image,
+          };
+        });
+
+        this.logger.debug(
+          'Creating order items from selection:',
+          JSON.stringify(orderItemsData, null, 2),
+        );
+        await this.orderItemsModel.insertMany(orderItemsData);
+        this.logger.debug(
+          `Created ${orderItemsData.length} order items from selection`,
+        );
+      }
+
+      // Remove selected items from cart using existing method
+      if (data.selectedProductIds.length > 0) {
+        try {
+          await this.cartService.checkoutSelectedItems(
+            data.userId,
+            data.selectedProductIds,
+          );
+          this.logger.debug('Selected items removed from cart successfully');
+        } catch (cartError) {
+          this.logger.error(
+            `Failed to remove selected items from cart: ${cartError.message}`,
+            cartError.stack,
+          );
+        }
+      }
+
+      // Return the complete order with items
+      const orderId = savedOrder._id as Types.ObjectId;
+      return this.findOne(orderId.toString());
+    } catch (error) {
+      this.logger.error(
+        `Error creating order from selected cart items: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
 }

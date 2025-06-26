@@ -48,3 +48,14 @@ export class CartPaymentDto {
   @IsString()
   language?: string;
 }
+
+export class SelectedCartPaymentDto {
+  @IsObject()
+  @ValidateNested()
+  @Type(() => CartDto)
+  cartPaymentDto: CartPaymentDto;
+
+  @IsArray()
+  @IsString({ each: true })
+  selectedProductIds: string[];
+}
