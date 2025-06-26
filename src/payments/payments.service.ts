@@ -25,74 +25,74 @@ export class PaymentsService {
     return this.vnpayService.getBankList();
   }
 
-  async createPaymentUrlFromCart(
-    cartPaymentDto: CartPaymentDto,
-    ipAddr: string,
-    userId: string,
-  ) {
-    const { cart } = cartPaymentDto;
+  // async createPaymentUrlFromCart(
+  //   cartPaymentDto: CartPaymentDto,
+  //   ipAddr: string,
+  //   userId: string,
+  // ) {
+  //   const { cart } = cartPaymentDto;
 
-    // Always use the userId from the JWT token, not from the request payload
-    const validatedUserId = userId;
+  //   // Always use the userId from the JWT token, not from the request payload
+  //   const validatedUserId = userId;
 
-    // Store userId in order info for verification later
-    const orderReference = `${Date.now()}`;
-    // Create order info with userId embedded for security
-    const orderInfo = `order_${orderReference}_user_${validatedUserId}`;
+  //   // Store userId in order info for verification later
+  //   const orderReference = `${Date.now()}`;
+  //   // Create order info with userId embedded for security
+  //   const orderInfo = `order_${orderReference}_user_${validatedUserId}`;
 
-    // Round the total price to a whole number and multiply by 100 for VND
-    const amountInVnd = Math.round(cart.totalPrice);
+  //   // Round the total price to a whole number and multiply by 100 for VND
+  //   const amountInVnd = Math.round(cart.totalPrice);
 
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
+  //   const tomorrow = new Date();
+  //   tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // Use exactly the fields that work without signature error
-    const paymentParams = {
-      vnp_Amount: amountInVnd,
-      vnp_IpAddr: ipAddr || '127.0.0.1',
-      vnp_TxnRef: orderReference,
-      vnp_OrderInfo: orderInfo,
-      vnp_OrderType: ProductCode.Other,
-      vnp_ReturnUrl: 'http://localhost:4000/payment-result',
-      vnp_Locale: VnpLocale.VN,
-      vnp_CreateDate: dateFormat(new Date()),
-      vnp_ExpireDate: dateFormat(tomorrow),
-    };
+  //   // Use exactly the fields that work without signature error
+  //   const paymentParams = {
+  //     vnp_Amount: amountInVnd,
+  //     vnp_IpAddr: ipAddr || '127.0.0.1',
+  //     vnp_TxnRef: orderReference,
+  //     vnp_OrderInfo: orderInfo,
+  //     vnp_OrderType: ProductCode.Other,
+  //     vnp_ReturnUrl: 'http://localhost:4000/payment-result',
+  //     vnp_Locale: VnpLocale.VN,
+  //     vnp_CreateDate: dateFormat(new Date()),
+  //     vnp_ExpireDate: dateFormat(tomorrow),
+  //   };
 
-    // Log payment parameters
-    this.logger.debug(
-      'Payment Parameters:',
-      JSON.stringify(paymentParams, null, 2),
-    );
+  //   // Log payment parameters
+  //   this.logger.debug(
+  //     'Payment Parameters:',
+  //     JSON.stringify(paymentParams, null, 2),
+  //   );
 
-    try {
-      const vnpUrlReturn =
-        await this.vnpayService.buildPaymentUrl(paymentParams);
+  //   try {
+  //     const vnpUrlReturn =
+  //       await this.vnpayService.buildPaymentUrl(paymentParams);
 
-      // Create a pending transaction record
-      await this.transactionsService.create({
-        orderId: orderReference,
-        status: 'pending',
-        totalAmount: cart.totalPrice,
-        paymentMethod: 'VNPAY',
-        paymentDetails: {
-          userId: validatedUserId, // Use the validated userId
-          cartId: cart._id,
-          ipAddr: ipAddr,
-        },
-      });
+  //     // Create a pending transaction record
+  //     await this.transactionsService.create({
+  //       orderId: orderReference,
+  //       status: 'pending',
+  //       totalAmount: cart.totalPrice,
+  //       paymentMethod: 'VNPAY',
+  //       paymentDetails: {
+  //         userId: validatedUserId, // Use the validated userId
+  //         cartId: cart._id,
+  //         ipAddr: ipAddr,
+  //       },
+  //     });
 
-      return {
-        paymentUrl: vnpUrlReturn,
-        orderReference,
-        totalAmount: cart.totalPrice,
-        currency: 'VND',
-      };
-    } catch (error) {
-      this.logger.error('Error generating payment URL:', error);
-      throw error;
-    }
-  }
+  //     return {
+  //       paymentUrl: vnpUrlReturn,
+  //       orderReference,
+  //       totalAmount: cart.totalPrice,
+  //       currency: 'VND',
+  //     };
+  //   } catch (error) {
+  //     this.logger.error('Error generating payment URL:', error);
+  //     throw error;
+  //   }
+  // }
 
   async verifyReturnUrl(query: any) {
     this.logger.debug(
@@ -203,6 +203,244 @@ export class PaymentsService {
             : String(createdOrder._id || '');
 
         this.logger.debug('Order created:', orderIdString);
+
+        // Send notification to staff about the new order that needs confirmation
+        await this.notificationsService.createStaffNotification({
+          type: 'order_confirmation_needed',
+          title: 'New Order Requires Confirmation',
+          message: `New order #${orderIdString} needs your confirmation.`,
+          orderId: orderIdString,
+          priority: 'high',
+        });
+
+        this.logger.debug(
+          'Order created and notification sent:',
+          orderIdString,
+        );
+
+        // Return a formatted result for the frontend
+        return {
+          isSuccess: true,
+          message:
+            'Payment successful. Order created and pending staff confirmation.',
+          orderId: orderIdString,
+          amount: amount,
+          transactionId: query.vnp_TransactionNo,
+          bankCode: query.vnp_BankCode,
+          paymentTime: query.vnp_PayDate,
+        };
+      }
+
+      return {
+        isSuccess: false,
+        message: 'Payment verification failed',
+        responseCode: query.vnp_ResponseCode,
+        originalData: query,
+      };
+    } catch (error) {
+      this.logger.error('Verification error:', error);
+      return {
+        isSuccess: false,
+        message: error.message || 'Payment verification error',
+        originalError: error,
+        originalQuery: query,
+      };
+    }
+  }
+
+  async createPaymentUrlFromCart(
+    cartPaymentDto: CartPaymentDto,
+    ipAddr: string,
+    userId: string,
+    selectedProductIds?: string[], // Add this parameter
+  ) {
+    const { cart } = cartPaymentDto;
+
+    // Always use the userId from the JWT token, not from the request payload
+    const validatedUserId = userId;
+
+    // Store userId in order info for verification later
+    const orderReference = `${Date.now()}`;
+    // Create order info with userId embedded for security
+    const orderInfo = `order_${orderReference}_user_${validatedUserId}`;
+
+    // Calculate total based on selected products if provided
+    let totalAmount = cart.totalPrice;
+    if (selectedProductIds && selectedProductIds.length > 0) {
+      totalAmount = cart.items
+        .filter((item) => selectedProductIds.includes(item.productId))
+        .reduce((sum, item) => sum + item.price * item.quantity, 0);
+    }
+
+    // Round the total price to a whole number and multiply by 100 for VND
+    const amountInVnd = Math.round(totalAmount);
+
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Use exactly the fields that work without signature error
+    const paymentParams = {
+      vnp_Amount: amountInVnd,
+      vnp_IpAddr: ipAddr || '127.0.0.1',
+      vnp_TxnRef: orderReference,
+      vnp_OrderInfo: orderInfo,
+      vnp_OrderType: ProductCode.Other,
+      vnp_ReturnUrl: 'http://localhost:4000/payment-result',
+      vnp_Locale: VnpLocale.VN,
+      vnp_CreateDate: dateFormat(new Date()),
+      vnp_ExpireDate: dateFormat(tomorrow),
+    };
+
+    // Log payment parameters
+    this.logger.debug(
+      'Payment Parameters:',
+      JSON.stringify(paymentParams, null, 2),
+    );
+
+    try {
+      const vnpUrlReturn =
+        await this.vnpayService.buildPaymentUrl(paymentParams);
+
+      // Create a pending transaction record
+      await this.transactionsService.create({
+        orderId: orderReference,
+        status: 'pending',
+        totalAmount: totalAmount,
+        paymentMethod: 'VNPAY',
+        paymentDetails: {
+          userId: validatedUserId,
+          cartId: cart._id,
+          ipAddr: ipAddr,
+          selectedProductIds: selectedProductIds || [], // Store selected product IDs
+        },
+      });
+
+      return {
+        paymentUrl: vnpUrlReturn,
+        orderReference,
+        totalAmount: totalAmount,
+        currency: 'VND',
+      };
+    } catch (error) {
+      this.logger.error('Error generating payment URL:', error);
+      throw error;
+    }
+  }
+
+  async verifyReturnUrlWithSelectedItems(query: any) {
+    this.logger.debug(
+      'Received return query params for selected items:',
+      JSON.stringify(query, null, 2),
+    );
+
+    try {
+      const verificationResult = await this.vnpayService.verifyReturnUrl(query);
+      this.logger.debug(
+        'Verification result:',
+        JSON.stringify(verificationResult, null, 2),
+      );
+
+      // Create transaction if payment is successful
+      if (verificationResult.isSuccess) {
+        const orderId = query.vnp_TxnRef;
+        const amount = parseInt(query.vnp_Amount, 10) / 100; // Convert back from VND format
+
+        // Extract userId from orderInfo (which was embedded during payment creation)
+        // Format: order_{orderReference}_user_{userId}
+        const orderInfo = query.vnp_OrderInfo;
+        const userIdMatch = orderInfo.match(/user_([^_]+)/);
+        const userId = userIdMatch ? userIdMatch[1] : null;
+
+        if (!userId) {
+          this.logger.error('Cannot extract userId from orderInfo');
+          throw new Error('Invalid order information');
+        }
+
+        // First, find and update any pending transaction with this orderId
+        const existingTransaction =
+          await this.transactionsService.findByOrderId(orderId);
+
+        let transaction;
+        if (existingTransaction) {
+          // Fix the type error by using explicit type conversion
+          const transactionId =
+            existingTransaction._id instanceof Types.ObjectId
+              ? existingTransaction._id.toString()
+              : String(existingTransaction._id);
+
+          // If transaction exists, update it to success
+          transaction = await this.transactionsService.updateStatus(
+            transactionId,
+            'success',
+          );
+
+          // Update the paymentDetails with VNPay response data
+          transaction = await this.transactionsService.update(transactionId, {
+            paymentDetails: {
+              ...existingTransaction.paymentDetails,
+              bankCode: query.vnp_BankCode,
+              cardType: query.vnp_CardType,
+              transactionNo: query.vnp_TransactionNo,
+              payDate: query.vnp_PayDate,
+              responseCode: query.vnp_ResponseCode,
+            },
+          });
+        } else {
+          // If no transaction exists, create a new one
+          transaction = await this.transactionsService.create({
+            orderId,
+            status: 'success',
+            totalAmount: amount,
+            paymentMethod: 'VNPAY',
+            paymentDetails: {
+              userId,
+              bankCode: query.vnp_BankCode,
+              cardType: query.vnp_CardType,
+              transactionNo: query.vnp_TransactionNo,
+              payDate: query.vnp_PayDate,
+              responseCode: query.vnp_ResponseCode,
+            },
+          });
+          this.logger.debug(`Created new transaction: ${transaction._id}`);
+        }
+
+        // Check if paymentDetails and cartId exist
+        const cartId = transaction.paymentDetails?.cartId || '';
+        const selectedProductIds =
+          transaction.paymentDetails?.selectedProductIds || [];
+
+        if (!cartId) {
+          this.logger.error('Cart ID not found in transaction details');
+          throw new Error('Cart information missing');
+        }
+
+        // Create order with pending status using selected products
+        // Use explicit type conversion for transaction._id
+        const transactionId =
+          transaction._id instanceof Types.ObjectId
+            ? transaction._id.toString()
+            : String(transaction._id);
+
+        const createdOrder =
+          await this.ordersService.createOrderFromSelectedCartItems({
+            userId: userId,
+            cartId: cartId,
+            transactionId: transactionId,
+            status: 'pending',
+            selectedProductIds: selectedProductIds,
+          });
+
+        if (!createdOrder) {
+          throw new Error('Failed to create order');
+        }
+
+        // Use explicit type conversion for createdOrder._id
+        const orderIdString =
+          createdOrder?._id instanceof Types.ObjectId
+            ? createdOrder._id.toString()
+            : String(createdOrder._id || '');
+
+        this.logger.debug('Order created from selected items:', orderIdString);
 
         // Send notification to staff about the new order that needs confirmation
         await this.notificationsService.createStaffNotification({
