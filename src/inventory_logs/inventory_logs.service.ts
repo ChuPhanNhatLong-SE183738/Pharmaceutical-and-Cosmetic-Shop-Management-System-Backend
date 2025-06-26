@@ -49,7 +49,7 @@ export class InventoryLogsService {
           inventoryLogId: savedInventoryLog._id,
           productId: new Types.ObjectId(product.productId),
           quantity: product.quantity,
-          expirtyDate: new Date(product.expirtyDate),
+          expiryDate: new Date(product.expiryDate),
           price: product.price,
         }),
       );
@@ -325,7 +325,7 @@ export class InventoryLogsService {
 
       const expiredItems = await this.inventoryLogItemsModel
         .find({
-          expirtyDate: { $lt: currentDate },
+          expiryDate: { $lt: currentDate },
         })
         .populate('productId', 'productName stock')
         .populate('inventoryLogId', 'status action')
@@ -430,7 +430,7 @@ export class InventoryLogsService {
               expiredItems: items.map((item) => ({
                 itemId: item._id,
                 quantity: item.quantity,
-                expirtyDate: item.expirtyDate,
+                expiryDate: item.expiryDate,
                 price: item.price,
                 inventoryLogId: item.inventoryLogId,
               })),
@@ -493,11 +493,11 @@ export class InventoryLogsService {
 
       const expiredItems = await this.inventoryLogItemsModel
         .find({
-          expirtyDate: { $lt: currentDate },
+          expiryDate: { $lt: currentDate },
         })
         .populate('productId', 'productName stock')
         .populate('inventoryLogId', 'status action batch')
-        .sort({ expirtyDate: 1 })
+        .sort({ expiryDate: 1 })
         .exec();
 
       return expiredItems.map((item) => {
@@ -525,10 +525,10 @@ export class InventoryLogsService {
               : (item.productId as any)?._id,
           productName: productInfo.productName,
           quantity: item.quantity,
-          expirtyDate: item.expirtyDate,
+          expiryDate: item.expiryDate,
           price: item.price,
           daysPastExpiry: Math.floor(
-            (currentDate.getTime() - item.expirtyDate.getTime()) /
+            (currentDate.getTime() - item.expiryDate.getTime()) /
               (1000 * 60 * 60 * 24),
           ),
           inventoryLogInfo: {

@@ -38,7 +38,7 @@ export class InventoryLogItemDto {
   })
   @IsNotEmpty()
   @IsDateString()
-  expirtyDate: string;
+  expiryDate: string;
 
   @ApiProperty({
     description: 'Import price of the product at the time of inventory',
@@ -68,13 +68,13 @@ export class CreateInventoryLogDto {
       {
         productId: '6123456789abcdef12345678',
         quantity: 50,
-        expirtyDate: '2025-12-31T23:59:59.000Z',
+        expiryDate: '2025-12-31T23:59:59.000Z',
         price: 25.99,
       },
       {
         productId: '6123456789abcdef87654321',
         quantity: 25,
-        expirtyDate: '2026-01-15T23:59:59.000Z',
+        expiryDate: '2026-01-15T23:59:59.000Z',
         price: 15.5,
       },
     ],

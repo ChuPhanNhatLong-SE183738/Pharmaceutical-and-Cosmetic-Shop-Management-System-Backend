@@ -18,35 +18,40 @@ export class InventoryLogItems {
 
   @Prop({ required: true })
   @IsNotEmpty()
-  expirtyDate: Date;
-  
+  expiryDate: Date;
+
   @Prop({ required: true })
   @IsNotEmpty()
   price: number;
 }
 
 export type InventoryLogItemsDocument = InventoryLogItems & Document;
-export const InventoryLogItemsSchema = SchemaFactory.createForClass(InventoryLogItems);
+export const InventoryLogItemsSchema =
+  SchemaFactory.createForClass(InventoryLogItems);
 
 @Schema({ timestamps: true })
 export class InventoryLog {
-    @Prop({ required: true })
-    @IsNotEmpty()
-    batch: string;
+  @Prop({ required: true })
+  @IsNotEmpty()
+  batch: string;
 
-    @Prop({ required: true, enum: ['import', 'export'] })
-    @IsNotEmpty()
-    action: string;
+  @Prop({ required: true, enum: ['import', 'export'] })
+  @IsNotEmpty()
+  action: string;
 
-    @Prop({ required: true, enum: ['pending', 'completed', 'denied'], default: 'pending' })
-    status: string;
+  @Prop({
+    required: true,
+    enum: ['pending', 'completed', 'denied'],
+    default: 'pending',
+  })
+  status: string;
 
-    @Prop({ type: MongooseSchema.ObjectId, ref: 'User', required: true })
-    userId: Types.ObjectId;
+  @Prop({ type: MongooseSchema.ObjectId, ref: 'User', required: true })
+  userId: Types.ObjectId;
 
-    @Prop({ type: String, required: false })
-    @IsOptional()
-    reason: string;
+  @Prop({ type: String, required: false })
+  @IsOptional()
+  reason: string;
 }
 
 export type InventoryLogDocument = InventoryLog & Document;

@@ -186,7 +186,7 @@ export class InventoryLogsController {
                           },
                         },
                         quantity: { type: 'number' },
-                        expirtyDate: { type: 'string', format: 'date-time' },
+                        expiryDate: { type: 'string', format: 'date-time' },
                         price: {
                           type: 'number',
                           description: 'Price at time of import',
@@ -355,7 +355,7 @@ export class InventoryLogsController {
                     },
                   },
                   quantity: { type: 'number' },
-                  expirtyDate: { type: 'string', format: 'date-time' },
+                  expiryDate: { type: 'string', format: 'date-time' },
                   price: {
                     type: 'number',
                     description: 'Price at time of import',
@@ -416,7 +416,7 @@ export class InventoryLogsController {
                 },
               },
               quantity: { type: 'number' },
-              expirtyDate: { type: 'string', format: 'date-time' },
+              expiryDate: { type: 'string', format: 'date-time' },
               createdAt: { type: 'string', format: 'date-time' },
               updatedAt: { type: 'string', format: 'date-time' },
             },
@@ -559,7 +559,7 @@ export class InventoryLogsController {
                       properties: {
                         itemId: { type: 'string' },
                         quantity: { type: 'number' },
-                        expirtyDate: { type: 'string', format: 'date-time' },
+                        expiryDate: { type: 'string', format: 'date-time' },
                         price: {
                           type: 'number',
                           description: 'Price at time of import',
@@ -646,7 +646,7 @@ export class InventoryLogsController {
               productId: { type: 'string' },
               productName: { type: 'string' },
               quantity: { type: 'number' },
-              expirtyDate: { type: 'string', format: 'date-time' },
+              expiryDate: { type: 'string', format: 'date-time' },
               price: { type: 'number', description: 'Price at time of import' },
               daysPastExpiry: { type: 'number' },
               inventoryLogInfo: {
