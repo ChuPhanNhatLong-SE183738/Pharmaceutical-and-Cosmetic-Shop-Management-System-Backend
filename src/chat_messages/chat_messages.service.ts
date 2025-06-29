@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { CreateChatMessageDto } from './dto/create-chat_message.dto';
+import { CreateChatMessageDto, SenderType } from './dto/create-chat_message.dto';
 import { UpdateChatMessageDto } from './dto/update-chat_message.dto';
 import { ChatMessage, ChatMessageDocument } from './entities/chat_message.entity';
 import { ChatHistory, ChatHistoryDocument } from '../chat_history/entities/chat_history.entity';
@@ -46,11 +46,33 @@ export class ChatMessagesService {
       messageContent: dto.messageContent,
     });
 
-    // Optionally, ensure the chat history belongs to the userId
-    await this.chatHistoryModel.updateOne(
+    // Update chat history to include this message
+    const chatHistory = await this.chatHistoryModel.findOneAndUpdate(
       { _id: new Types.ObjectId(dto.chatId), userId: new Types.ObjectId(dto.userId) },
-      { $push: { messages: message._id } }
+      { $push: { messages: message._id } },
+      { new: true }
     );
+
+    // If this is the first user message and chat title is still "New Chat", update the title
+    if (dto.sender === SenderType.USER && chatHistory && chatHistory.title === 'New Chat') {
+      // Check if this is actually the first user message
+      const userMessages = await this.chatMessageModel.countDocuments({
+        chatId: new Types.ObjectId(dto.chatId),
+        sender: SenderType.USER
+      });
+
+      if (userMessages === 1) { // This is the first user message
+        // Truncate message if too long for title
+        const title = dto.messageContent.length > 50 
+          ? dto.messageContent.substring(0, 47) + '...' 
+          : dto.messageContent;
+
+        await this.chatHistoryModel.findByIdAndUpdate(
+          dto.chatId,
+          { title: title }
+        );
+      }
+    }
 
     return message;
   }

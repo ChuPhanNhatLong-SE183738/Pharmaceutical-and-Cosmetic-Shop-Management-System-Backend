@@ -1,8 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { ChatHistory, ChatHistoryDocument } from './entities/chat_history.entity';
-import { ChatMessage, ChatMessageDocument } from '../chat_messages/entities/chat_message.entity';
+import {
+  ChatHistory,
+  ChatHistoryDocument,
+} from './entities/chat_history.entity';
+import {
+  ChatMessage,
+  ChatMessageDocument,
+} from '../chat_messages/entities/chat_message.entity';
 
 @Injectable()
 export class ChatHistoryService {
@@ -18,6 +24,7 @@ export class ChatHistoryService {
     const chatHistory = await this.chatHistoryModel.create({
       userId: new Types.ObjectId(userId),
       messages: [],
+      title: 'New Chat',
     });
 
     // Create the first AI message
@@ -41,21 +48,38 @@ export class ChatHistoryService {
       .exec();
   }
 
-  async removeChatHistory(id: string): Promise<{deleted: boolean}> {
+  async removeChatHistory(id: string): Promise<{ deleted: boolean }> {
     try {
-      const chatHistory = await this.chatHistoryModel.findById(id)
+      const chatHistory = await this.chatHistoryModel.findById(id);
 
       if (!chatHistory) {
         throw new NotFoundException(`Chat history with id ${id} not found`);
       }
 
-      await this.chatMessageModel.deleteMany({chatId: new Types.ObjectId(id)})
+      await this.chatMessageModel.deleteMany({
+        chatId: new Types.ObjectId(id),
+      });
 
-      await this.chatHistoryModel.findByIdAndDelete(id)
+      await this.chatHistoryModel.findByIdAndDelete(id);
 
-      return {deleted: true}
+      return { deleted: true };
     } catch (error) {
       throw new Error(`Failed to delete chat history: ${error.message}`);
     }
+  }
+
+  async updateTitle(chatId: string, title: string): Promise<ChatHistory> {
+    const truncatedTitle =
+      title.length > 50 ? title.substring(0, 47) + '...' : title;
+
+    const updatedChatHistory = await this.chatHistoryModel
+      .findByIdAndUpdate(chatId, { title: truncatedTitle }, { new: true })
+      .exec();
+
+    if (!updatedChatHistory) {
+      throw new NotFoundException(`Chat history with ID ${chatId} not found`);
+    }
+
+    return updatedChatHistory;
   }
 }

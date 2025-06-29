@@ -10,6 +10,9 @@ export class ChatHistory {
 
   @Prop({ type: [{ type: MongooseSchema.Types.ObjectId, ref: 'ChatMessage' }], default: [] })
   messages: Types.ObjectId[]; 
+
+  @Prop({type: String, default: "New Chat"})
+  title: string;
 }
 
 export const ChatHistorySchema = SchemaFactory.createForClass(ChatHistory);
