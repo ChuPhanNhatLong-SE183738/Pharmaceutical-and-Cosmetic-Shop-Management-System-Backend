@@ -72,12 +72,110 @@ export class InventoryLogsService {
     }
   }
 
+  private async validateExportBatches(products: any[]): Promise<void> {
+    for (const product of products) {
+      if (product.batch) {
+        const batchItem = await this.inventoryLogItemsModel
+          .findOne({
+            productId: new Types.ObjectId(product.productId),
+            batch: product.batch,
+            stock: { $gt: 0 },
+          })
+          .populate('inventoryLogId', 'status action');
+
+        if (
+          !batchItem ||
+          (batchItem.inventoryLogId as any)?.status !== 'completed' ||
+          (batchItem.inventoryLogId as any)?.action !== 'import'
+        ) {
+          const availableBatches = await this.inventoryLogItemsModel
+            .find({
+              productId: new Types.ObjectId(product.productId),
+              stock: { $gt: 0 },
+            })
+            .populate('inventoryLogId', 'status action')
+            .exec();
+
+          const validBatches = availableBatches
+            .filter(
+              (item) =>
+                (item.inventoryLogId as any)?.status === 'completed' &&
+                (item.inventoryLogId as any)?.action === 'import',
+            )
+            .map((item) => `${item.batch} (${item.stock} units)`);
+
+          const suggestion =
+            validBatches.length > 0
+              ? `Available batches: ${validBatches.join(', ')}`
+              : 'No batches available for this product';
+
+          throw new BadRequestException(
+            `Batch '${product.batch}' not found for product ${product.productId} or has no available stock. ${suggestion}`,
+          );
+        }
+
+        if (batchItem.stock < product.quantity) {
+          throw new BadRequestException(
+            `Insufficient stock in batch '${product.batch}'. Available: ${batchItem.stock}, Requested: ${product.quantity}`,
+          );
+        }
+      } else {
+        const pipeline = [
+          {
+            $match: {
+              productId: new Types.ObjectId(product.productId),
+              stock: { $gt: 0 },
+            },
+          },
+          {
+            $lookup: {
+              from: 'inventorylogs',
+              localField: 'inventoryLogId',
+              foreignField: '_id',
+              as: 'inventoryLog',
+            },
+          },
+          {
+            $match: {
+              'inventoryLog.status': 'completed',
+              'inventoryLog.action': 'import',
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              totalStock: { $sum: '$stock' },
+            },
+          },
+        ];
+
+        const totalStock =
+          await this.inventoryLogItemsModel.aggregate(pipeline);
+        const availableStock = totalStock[0]?.totalStock || 0;
+
+        if (availableStock < product.quantity) {
+          throw new BadRequestException(
+            `Insufficient total stock for product ${product.productId}. Available: ${availableStock}, Requested: ${product.quantity}`,
+          );
+        }
+      }
+    }
+  }
+
   async create(
     createInventoryLogDto: CreateInventoryLogDto,
   ): Promise<InventoryLogDocument> {
     try {
       for (const product of createInventoryLogDto.products) {
         await this.productsService.findOne(product.productId);
+      }
+
+      if (createInventoryLogDto.action === 'export') {
+        await this.validateExportBatches(createInventoryLogDto.products);
+      }
+
+      if (createInventoryLogDto.action === 'export') {
+        await this.validateExportBatches(createInventoryLogDto.products);
       }
 
       const newInventoryLog = new this.inventoryLogModel({
