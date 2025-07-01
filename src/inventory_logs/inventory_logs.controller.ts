@@ -17,6 +17,7 @@ import { InventoryLogsService } from './inventory_logs.service';
 import { CreateInventoryLogDto } from './dto/create-inventory_log.dto';
 import { ReviewInventoryLogDto } from './dto/review-inventory_request.dto';
 import { InventoryLogFilterDto } from './dto/inventory_log-filter.dto';
+import { UpdateBatchStockDto } from './dto/update-batch-stock.dto';
 import { successResponse, errorResponse } from '../helper/response.helper';
 import {
   ApiBearerAuth,
@@ -62,13 +63,28 @@ export class InventoryLogsController {
           type: 'object',
           properties: {
             _id: { type: 'string' },
-            batch: { type: 'string' },
             action: { type: 'string', enum: ['import', 'export'] },
             status: {
               type: 'string',
               enum: ['pending', 'completed', 'denied'],
             },
             userId: { type: 'string' },
+            items: {
+              type: 'array',
+              description: 'Created inventory log items with batch information',
+              items: {
+                type: 'object',
+                properties: {
+                  _id: { type: 'string' },
+                  productId: { type: 'string' },
+                  quantity: { type: 'number' },
+                  batch: { type: 'string' },
+                  stock: { type: 'number' },
+                  expiryDate: { type: 'string', format: 'date-time' },
+                  price: { type: 'number' },
+                },
+              },
+            },
             createdAt: { type: 'string', format: 'date-time' },
             updatedAt: { type: 'string', format: 'date-time' },
           },
@@ -150,7 +166,6 @@ export class InventoryLogsController {
                 type: 'object',
                 properties: {
                   _id: { type: 'string' },
-                  batch: { type: 'string' },
                   action: { type: 'string', enum: ['import', 'export'] },
                   status: {
                     type: 'string',
@@ -167,7 +182,8 @@ export class InventoryLogsController {
                   reason: { type: 'string' },
                   items: {
                     type: 'array',
-                    description: 'Inventory log items with product details',
+                    description:
+                      'Inventory log items with product details and batch information',
                     items: {
                       type: 'object',
                       properties: {
@@ -187,6 +203,14 @@ export class InventoryLogsController {
                         },
                         quantity: { type: 'number' },
                         expiryDate: { type: 'string', format: 'date-time' },
+                        batch: {
+                          type: 'string',
+                          description: 'Batch identifier for this item',
+                        },
+                        stock: {
+                          type: 'number',
+                          description: 'Current stock level for this batch',
+                        },
                         price: {
                           type: 'number',
                           description: 'Price at time of import',
@@ -550,8 +574,8 @@ export class InventoryLogsController {
                   productName: { type: 'string' },
                   expiredQuantity: { type: 'number' },
                   quantityRemoved: { type: 'number' },
-                  currentStockBefore: { type: 'number' },
-                  currentStockAfter: { type: 'number' },
+                  stockBefore: { type: 'number' },
+                  stockAfter: { type: 'number' },
                   expiredItems: {
                     type: 'array',
                     items: {
@@ -658,7 +682,7 @@ export class InventoryLogsController {
                   action: { type: 'string' },
                 },
               },
-              currentStock: { type: 'number' },
+              stock: { type: 'number' },
             },
           },
         },
@@ -723,8 +747,8 @@ export class InventoryLogsController {
                       productName: { type: 'string' },
                       expiredQuantity: { type: 'number' },
                       quantityRemoved: { type: 'number' },
-                      currentStockBefore: { type: 'number' },
-                      currentStockAfter: { type: 'number' },
+                      stockBefore: { type: 'number' },
+                      stockAfter: { type: 'number' },
                     },
                   },
                 },
@@ -848,6 +872,98 @@ export class InventoryLogsController {
       this.logger.error(
         `Failed to retrieve product inventory items: ${error.message}`,
       );
+      return errorResponse(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @Get('product/:productId/batches')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.STAFF)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get product stock by batches',
+    description: 'Retrieves stock breakdown by batches for a specific product',
+  })
+  @ApiParam({
+    name: 'productId',
+    description: 'Product ID to get batch stock for',
+    example: '6123456789abcdef12345678',
+  })
+  @ApiOkResponse({
+    description: 'Product batch stock retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        data: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              batch: { type: 'string' },
+              stock: { type: 'number' },
+              expiryDate: { type: 'string', format: 'date-time' },
+              price: { type: 'number' },
+            },
+          },
+        },
+        message: { type: 'string' },
+      },
+    },
+  })
+  @ApiUnauthorizedResponse({ description: 'User not authenticated' })
+  @ApiNotFoundResponse({ description: 'Product not found' })
+  async getProductStockByBatches(@Param('productId') productId: string) {
+    try {
+      const batches =
+        await this.inventoryLogsService.getProductStockByBatches(productId);
+      return successResponse(
+        batches,
+        'Product batch stock retrieved successfully',
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to retrieve product batch stock: ${error.message}`,
+      );
+      return errorResponse(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @Post('batch/update-stock')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.STAFF)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Update batch stock',
+    description:
+      'Update stock level for a specific inventory log item by quantity change',
+  })
+  @ApiBody({
+    type: UpdateBatchStockDto,
+    description: 'Data for updating batch stock',
+  })
+  @ApiOkResponse({
+    description: 'Batch stock updated successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        message: { type: 'string' },
+      },
+    },
+  })
+  @ApiUnauthorizedResponse({ description: 'User not authenticated' })
+  @ApiNotFoundResponse({ description: 'Inventory log item not found' })
+  @ApiBadRequestResponse({ description: 'Invalid quantity change' })
+  async updateBatchStock(@Body() updateData: UpdateBatchStockDto) {
+    try {
+      await this.inventoryLogsService.updateBatchStock(
+        updateData.inventoryLogItemId,
+        updateData.quantityChange,
+      );
+      return successResponse(null, 'Batch stock updated successfully');
+    } catch (error) {
+      this.logger.error(`Failed to update batch stock: ${error.message}`);
       return errorResponse(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }

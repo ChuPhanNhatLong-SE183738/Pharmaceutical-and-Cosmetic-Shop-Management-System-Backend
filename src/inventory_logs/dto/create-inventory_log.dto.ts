@@ -5,7 +5,6 @@ import {
   IsMongoId,
   IsNotEmpty,
   IsNumber,
-  IsOptional,
   IsString,
   Min,
   ValidateNested,
@@ -49,20 +48,21 @@ export class InventoryLogItemDto {
   @IsNumber()
   @Min(0)
   price: number;
-}
 
-export class CreateInventoryLogDto {
   @ApiProperty({
-    description: 'Batch identifier for the inventory operation',
-    example: 'BATCH-2025-001',
+    description:
+      'Batch number - Required for imports (new batch), Optional for exports (specific batch selection, uses FIFO if not specified)',
+    example: 'SKINCARE-2025-001',
   })
   @IsNotEmpty()
   @IsString()
   batch: string;
+}
 
+export class CreateInventoryLogDto {
   @ApiProperty({
     description:
-      'List of products with quantities and expiry dates for this inventory operation',
+      'List of products with quantities, expiry dates, and batch numbers for this inventory operation',
     type: [InventoryLogItemDto],
     example: [
       {
@@ -70,12 +70,14 @@ export class CreateInventoryLogDto {
         quantity: 50,
         expiryDate: '2025-12-31T23:59:59.000Z',
         price: 25.99,
+        batch: 'SKINCARE-2025-001',
       },
       {
         productId: '6123456789abcdef87654321',
         quantity: 25,
         expiryDate: '2026-01-15T23:59:59.000Z',
         price: 15.5,
+        batch: 'MAKEUP-2025-045', 
       },
     ],
   })
