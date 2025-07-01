@@ -195,4 +195,22 @@ export class OrdersController {
       return errorResponse(error.message, HttpStatus.NOT_FOUND);
     }
   }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Get('revenue/admin')
+  @ApiOperation({ summary: 'Get revenue from orders' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns total revenue from all orders',
+  })
+  async getRevenue() {
+    try {
+      const revenue = await this.ordersService.getRevenueFromOrders();
+      return successResponse(revenue, 'Total revenue retrieved successfully');
+    } catch (error) {
+      return errorResponse(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
 }

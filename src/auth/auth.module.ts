@@ -9,6 +9,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { RolesGuard } from './guards/roles.guard';
 import { CartModule } from '../cart/cart.module'; // Import CartModule
+import { EmailService } from './email.service';
 
 @Module({
   imports: [
@@ -26,7 +27,13 @@ import { CartModule } from '../cart/cart.module'; // Import CartModule
     CartModule, // Add CartModule to imports
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, LocalStrategy, RolesGuard],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    LocalStrategy,
+    RolesGuard,
+    EmailService,
+  ],
   exports: [AuthService],
 })
 export class AuthModule {}
