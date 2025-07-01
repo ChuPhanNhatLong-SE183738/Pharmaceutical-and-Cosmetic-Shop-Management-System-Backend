@@ -28,6 +28,50 @@ export class InventoryLogsService {
     private inventoryLogItemsModel: Model<InventoryLogItems>,
     private readonly productsService: ProductsService,
   ) {}
+  private async generateBatchNumber(productId: string): Promise<string> {
+    try {
+      const product = await this.productsService.findOne(productId);
+
+      const now = new Date();
+      const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+
+      const productPrefix = product.productName
+        .replace(/[^A-Za-z0-9]/g, '')
+        .substring(0, 4)
+        .toUpperCase()
+        .padEnd(4, '0');
+
+      const todayPrefix = `${productPrefix}-${dateStr}`;
+      const existingBatches = await this.inventoryLogItemsModel
+        .find({
+          productId: new Types.ObjectId(productId),
+          batch: { $regex: `^${todayPrefix}-` },
+        })
+        .sort({ createdAt: -1 })
+        .limit(1);
+
+      let sequence = 1;
+      if (existingBatches.length > 0) {
+        const lastBatch = existingBatches[0].batch;
+        const lastSequence = parseInt(lastBatch.split('-').pop() || '0');
+        sequence = lastSequence + 1;
+      }
+
+      // Format: PREFIX-YYYYMMDD-XXX
+      const batchNumber = `${todayPrefix}-${sequence.toString().padStart(3, '0')}`;
+
+      this.logger.debug(
+        `Generated batch number: ${batchNumber} for product ${productId}`,
+      );
+      return batchNumber;
+    } catch (error) {
+      this.logger.error(`Error generating batch number: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to generate batch number: ${error.message}`,
+      );
+    }
+  }
+
   async create(
     createInventoryLogDto: CreateInventoryLogDto,
   ): Promise<InventoryLogDocument> {
@@ -43,15 +87,24 @@ export class InventoryLogsService {
       });
 
       const savedInventoryLog = await newInventoryLog.save();
-      const inventoryLogItems = createInventoryLogDto.products.map(
-        (product) => ({
-          inventoryLogId: savedInventoryLog._id,
-          productId: new Types.ObjectId(product.productId),
-          quantity: product.quantity,
-          expiryDate: new Date(product.expiryDate),
-          price: product.price,
-          batch: product.batch,
-          stock: product.quantity,
+
+      const inventoryLogItems = await Promise.all(
+        createInventoryLogDto.products.map(async (product) => {
+          let batchNumber = product.batch;
+
+          if (createInventoryLogDto.action === 'import' && !product.batch) {
+            batchNumber = await this.generateBatchNumber(product.productId);
+          }
+
+          return {
+            inventoryLogId: savedInventoryLog._id,
+            productId: new Types.ObjectId(product.productId),
+            quantity: product.quantity,
+            expiryDate: new Date(product.expiryDate),
+            price: product.price,
+            batch: batchNumber,
+            stock: product.quantity,
+          };
         }),
       );
 
