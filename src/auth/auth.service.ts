@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Response } from 'express';
 import { UsersService } from '../users/users.service';
@@ -6,13 +10,17 @@ import { CreateUserDto } from '../users/dto/create-user.dto';
 import { UserDocument } from '../users/entities/user.entity';
 import { CartService } from '../cart/cart.service'; // Import CartService
 import { Types } from 'mongoose';
+import { EmailService } from './email.service';
+import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
-    private cartService: CartService, // Inject CartService
+    private cartService: CartService,
+    private emailService: EmailService,
   ) {}
 
   async validateUser(email: string, password: string) {
@@ -182,5 +190,188 @@ export class AuthService {
     } catch (error) {
       throw new UnauthorizedException('Failed to fetch user profile');
     }
+  }
+
+  // Email verification methods
+  async verifyEmail(token: string) {
+    try {
+      // Find user by verification token
+      const user = await this.usersService.findByVerificationToken(token);
+
+      if (!user) {
+        throw new BadRequestException('Invalid or expired verification token');
+      }
+      if (!user.verificationTokenCreatedAt) {
+        throw new BadRequestException('Invalid verification token');
+      }
+
+      const tokenAge = Date.now() - user.verificationTokenCreatedAt.getTime();
+      if (tokenAge > 24 * 60 * 60 * 1000) {
+        // 24 hours in milliseconds
+        throw new BadRequestException('Verification token has expired');
+      } // Update user verification status
+      user.isVerified = true;
+      user.verificationToken = null;
+      user.verificationTokenCreatedAt = null;
+      await user.save();
+
+      // Send welcome email
+      await this.emailService.sendWelcomeEmail(user.email, user.fullName);
+
+      return {
+        verified: true,
+        user: {
+          id: user._id,
+          email: user.email,
+          isVerified: user.isVerified,
+        },
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Email verification failed');
+    }
+  }
+
+  async resendVerificationEmail(email: string) {
+    try {
+      const user = await this.usersService.findByEmail(email);
+
+      if (!user) {
+        throw new BadRequestException('User not found');
+      }
+
+      if (user.isVerified) {
+        throw new BadRequestException('Email is already verified');
+      }
+
+      // Generate new verification token
+      const verificationToken = crypto.randomBytes(32).toString('hex'); // Update user with new token
+      user.verificationToken = verificationToken;
+      user.verificationTokenCreatedAt = new Date();
+      await user.save();
+
+      // Send verification email
+      await this.emailService.sendVerificationEmail(
+        user.email,
+        verificationToken,
+      );
+
+      return { message: 'Verification email sent successfully' };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to resend verification email');
+    }
+  }
+  async generateVerificationToken(user: UserDocument): Promise<string> {
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+
+    user.verificationToken = verificationToken;
+    user.verificationTokenCreatedAt = new Date();
+    await user.save();
+
+    // Send verification email
+    await this.emailService.sendVerificationEmail(
+      user.email,
+      verificationToken,
+    );
+
+    // Save HTML preview for development
+    await this.emailService.saveEmailTemplatePreview(
+      user.email,
+      verificationToken,
+      user.fullName,
+    );
+
+    return verificationToken;
+  }
+
+  async sendForgotPasswordEmail(email: string, isMobile: boolean = false) {
+    const user = await this.usersService.findByEmail(email);
+
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    if (isMobile) {
+      // Sinh OTP 6 số
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      user.otp = otp;
+      user.otpCreatedAt = new Date();
+      await user.save();
+      // Gửi OTP qua email
+      await this.emailService.sendForgotPasswordOtpEmail(user.email, otp);
+      return { message: 'OTP sent to email for password reset (mobile)', otp }; // Trả về otp để debug nếu cần
+    } else {
+      // Generate reset token (web)
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      user.verificationToken = resetToken;
+      user.verificationTokenCreatedAt = new Date();
+      await user.save();
+      // Send reset password email (web)
+      await this.emailService.sendForgotPasswordEmail(user.email, resetToken);
+      return { message: 'Reset password email sent successfully' };
+    }
+  }
+
+  async resetPassword(
+    token: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
+    const user = await this.usersService.findByVerificationToken(token);
+
+    if (!user) {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+
+    if (!user.verificationTokenCreatedAt) {
+      throw new Error('Verification token creation time is missing');
+    }
+    const tokenAge = Date.now() - user.verificationTokenCreatedAt.getTime();
+    if (tokenAge > 24 * 60 * 60 * 1000) {
+      // 24 hours in milliseconds
+      throw new BadRequestException('Reset token has expired');
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    // Update user's password
+    user.password = await bcrypt.hash(newPassword, salt);
+    user.verificationToken = null;
+    user.verificationTokenCreatedAt = null;
+    await user.save();
+
+    return { message: 'Password reset successfully' };
+  }
+
+  async resetPasswordWithOtp(
+    email: string,
+    otp: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
+    const user = await this.usersService.findByEmail(email);
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+    if (!user.otp || !user.otpCreatedAt) {
+      throw new BadRequestException('OTP is invalid or expired');
+    }
+    // Kiểm tra OTP hết hạn (10 phút)
+    const otpAge = Date.now() - new Date(user.otpCreatedAt).getTime();
+    if (otpAge > 10 * 60 * 1000) {
+      throw new BadRequestException('OTP has expired');
+    }
+    if (user.otp !== otp) {
+      throw new BadRequestException('OTP is incorrect');
+    }
+    // Đặt lại mật khẩu
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    user.otp = null;
+    user.otpCreatedAt = null;
+    await user.save();
+    return { message: 'Password reset successfully' };
   }
 }

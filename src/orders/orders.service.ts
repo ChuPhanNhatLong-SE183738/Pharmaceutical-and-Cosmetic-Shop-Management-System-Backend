@@ -722,4 +722,67 @@ export class OrdersService {
       throw error;
     }
   }
+
+  async getRevenueFromOrders(): Promise<
+    Array<{
+      date: string;
+      revenue: number;
+      orderCount: number;
+    }>
+  > {
+    try {
+      const endDate = new Date();
+      endDate.setHours(23, 59, 59, 999);
+      const startDate = new Date();
+      startDate.setDate(endDate.getDate() - 6);
+      startDate.setHours(0, 0, 0, 0);
+
+      const orders = await this.ordersModel
+        .find({
+          status: 'approved',
+          createdAt: {
+            $gte: startDate,
+            $lte: endDate,
+          },
+        })
+        .lean()
+        .exec();
+
+      const days: Array<{
+        date: string;
+        revenue: number;
+        orderCount: number;
+      }> = [];
+
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(endDate);
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0];
+
+        const dayOrders = orders.filter((order) => {
+          const orderDoc = order as unknown as { createdAt: Date };
+          return orderDoc.createdAt.toISOString().split('T')[0] === dateStr;
+        });
+
+        const dailyRevenue = dayOrders.reduce(
+          (sum, order) => sum + (order.totalAmount || 0),
+          0,
+        );
+
+        days.push({
+          date: dateStr,
+          revenue: dailyRevenue,
+          orderCount: dayOrders.length,
+        });
+      }
+
+      return days.sort((a, b) => a.date.localeCompare(b.date));
+    } catch (error) {
+      this.logger.error(
+        `Error calculating revenue from orders: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
 }

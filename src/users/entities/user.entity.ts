@@ -67,6 +67,18 @@ export class User {
   @IsNotEmpty()
   @Prop({ type: String, enum: Role, default: Role.CUSTOMER })
   role: Role;
+
+  @Prop({ type: String, default: null })
+  verificationToken: string | null;
+
+  @Prop({ type: Date, default: null })
+  verificationTokenCreatedAt: Date | null;
+
+  @Prop({ type: String, default: null })
+  otp: string | null;
+
+  @Prop({ type: Date, default: null })
+  otpCreatedAt: Date | null;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

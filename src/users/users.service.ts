@@ -178,26 +178,39 @@ export class UsersService {
       }
 
       this.logger.debug(`Uploading avatar for user: ${userId}`);
-      
+
       // Upload to Cloudinary with optimization settings
       const imageUrl = await this.cloudinaryService.uploadImage(file, {
         folder: 'avatars',
         width: 400, // Reasonable size for avatar
         height: 400,
         crop: 'fill', // Crop and resize to exact dimensions
-        quality: 'auto' // Auto-optimize quality
+        quality: 'auto', // Auto-optimize quality
       });
-      
+
       // Update user's photo URL
       user.photoUrl = imageUrl;
       await user.save();
 
-      this.logger.debug(`Successfully updated avatar for user ${userId}: ${imageUrl}`);
-      
+      this.logger.debug(
+        `Successfully updated avatar for user ${userId}: ${imageUrl}`,
+      );
+
       return user;
     } catch (error) {
       this.logger.error(`Avatar upload failed: ${error.message}`);
-      throw new BadRequestException(`Failed to update avatar: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to update avatar: ${error.message}`,
+      );
     }
+  }
+  async findByVerificationToken(token: string): Promise<UserDocument> {
+    const user = await this.userModel
+      .findOne({ verificationToken: token })
+      .exec();
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    return user;
   }
 }
