@@ -775,4 +775,80 @@ export class InventoryLogsController {
       return errorResponse(error.message, HttpStatus.BAD_REQUEST);
     }
   }
+
+  @Get('product/:productId/items')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get inventory log items by product',
+    description:
+      'Retrieves all inventory log items for a specific product with batch and expiry information',
+  })
+  @ApiParam({
+    name: 'productId',
+    description: 'Product ID to get inventory items for',
+  })
+  @ApiOkResponse({
+    description: 'Product inventory items retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        data: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              _id: { type: 'string' },
+              productId: {
+                type: 'object',
+                properties: {
+                  _id: { type: 'string' },
+                  productName: { type: 'string' },
+                  price: { type: 'number' },
+                  stock: { type: 'number' },
+                },
+              },
+              inventoryLogId: {
+                type: 'object',
+                properties: {
+                  _id: { type: 'string' },
+                  batch: { type: 'string' },
+                  action: { type: 'string', enum: ['import', 'export'] },
+                  status: {
+                    type: 'string',
+                    enum: ['pending', 'completed', 'denied'],
+                  },
+                  createdAt: { type: 'string', format: 'date-time' },
+                },
+              },
+              quantity: { type: 'number' },
+              expiryDate: { type: 'string', format: 'date-time' },
+              price: { type: 'number', description: 'Price at time of import' },
+            },
+          },
+        },
+        message: { type: 'string' },
+      },
+    },
+  })
+  @ApiUnauthorizedResponse({ description: 'User not authenticated' })
+  @ApiNotFoundResponse({ description: 'Product not found' })
+  async getProductInventoryItems(@Param('productId') productId: string) {
+    try {
+      const items =
+        await this.inventoryLogsService.getInventoryLogItemsByProduct(
+          productId,
+        );
+      return successResponse(
+        items,
+        'Product inventory items retrieved successfully',
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to retrieve product inventory items: ${error.message}`,
+      );
+      return errorResponse(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
 }

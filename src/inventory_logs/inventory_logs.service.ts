@@ -314,6 +314,17 @@ export class InventoryLogsService {
       .exec();
   }
 
+  async getInventoryLogItemsByProduct(productId: string) {
+    return this.inventoryLogItemsModel
+      .find({
+        productId: new Types.ObjectId(productId),
+      })
+      .populate('productId', 'productName price stock')
+      .populate('inventoryLogId', 'batch action status createdAt')
+      .sort({ expiryDate: 1 })
+      .exec();
+  }
+
   async processExpiredProducts(checkDate?: Date): Promise<{
     processedItems: any[];
     totalExpiredItems: number;
