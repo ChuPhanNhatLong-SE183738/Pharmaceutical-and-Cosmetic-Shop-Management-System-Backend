@@ -31,7 +31,12 @@ export class AnalyseService {
     @InjectModel(Analyse.name) private analyseModel: Model<AnalyseDocument>,
     private productsService: ProductsService,
   ) {
-    this.modelPath = path.join(process.cwd(), 'src', 'data_model','model.onnx');
+    this.modelPath = path.join(
+      process.cwd(),
+      'src',
+      'data_model',
+      'model.onnx',
+    );
     this.labels = [
       'Acne',
       'Blackheads',
@@ -120,15 +125,45 @@ export class AnalyseService {
 
   async generateRecommendations(skinType: string): Promise<any[]> {
     try {
+      // const query = skinType === 'normal skin' ? 'All skin types' : skinType;
+      let query;
+      switch (skinType) {
+        case 'Acne':
+          query = 'Oily Skin';
+          break;
+        case 'Blackheads':
+          query = 'Oily Skin';
+          break;
+        case 'Dark Spots':
+          query = 'All skin types';
+          break;
+        case 'Dry Skin':
+          query = 'Dry Skin';
+          break;
+        case 'Normal Skin':
+          query = 'All skin types';
+          break;
+        case 'Oily Skin':
+          query = 'Oily Skin';
+          break;
+        case 'Wrinkles':
+          query = 'All skin types';
+          break;
+        default:
+          query = 'All skin types';
+          break;
+      }
+      console.log(query);
       const { products } = await this.productsService.findAll({
-        search: skinType,
+        suitableFor: query,
         limit: 5,
+        sort: { rating: -1 },
       });
 
       return products.map((product, index) => ({
         recommendationId: `rec-${index + 1}-${Date.now()}`,
         productId: (product._id as Types.ObjectId | string).toString(),
-        reason: `Suitable for ${skinType} skin type`,
+        reason: `Suitable for ${query} skin type`,
       }));
     } catch (error) {
       this.logger.error(`Error generating recommendations: ${error.message}`);
