@@ -53,8 +53,10 @@ export class InventoryLogsService {
       let sequence = 1;
       if (existingBatches.length > 0) {
         const lastBatch = existingBatches[0].batch;
-        const lastSequence = parseInt(lastBatch.split('-').pop() || '0');
-        sequence = lastSequence + 1;
+        if (lastBatch) {
+          const lastSequence = parseInt(lastBatch.split('-').pop() || '0');
+          sequence = lastSequence + 1;
+        }
       }
 
       // Format: PREFIX-YYYYMMDD-XXX
@@ -174,6 +176,21 @@ export class InventoryLogsService {
         await this.productsService.findOne(product.productId);
       }
 
+      if (createInventoryLogDto.action === 'import') {
+        for (const product of createInventoryLogDto.products) {
+          if (!product.expiryDate) {
+            throw new BadRequestException(
+              `Expiry date is required for import operations`,
+            );
+          }
+          if (product.price === undefined || product.price === null) {
+            throw new BadRequestException(
+              `Price is required for import operations`,
+            );
+          }
+        }
+      }
+
       if (createInventoryLogDto.action === 'export') {
         await this.validateExportBatches(createInventoryLogDto.products);
       }
@@ -194,15 +211,20 @@ export class InventoryLogsService {
             batchNumber = await this.generateBatchNumber(product.productId);
           }
 
-          return {
+          const itemData: any = {
             inventoryLogId: savedInventoryLog._id,
             productId: new Types.ObjectId(product.productId),
             quantity: product.quantity,
-            expiryDate: new Date(product.expiryDate),
-            price: product.price,
             batch: batchNumber,
             stock: product.quantity,
           };
+
+          if (createInventoryLogDto.action === 'import') {
+            itemData.expiryDate = new Date(product.expiryDate!);
+            itemData.price = product.price!;
+          }
+
+          return itemData;
         }),
       );
 
@@ -715,10 +737,12 @@ export class InventoryLogsService {
           quantity: item.quantity,
           expiryDate: item.expiryDate,
           price: item.price,
-          daysPastExpiry: Math.floor(
-            (currentDate.getTime() - item.expiryDate.getTime()) /
-              (1000 * 60 * 60 * 24),
-          ),
+          daysPastExpiry: item.expiryDate
+            ? Math.floor(
+                (currentDate.getTime() - item.expiryDate.getTime()) /
+                  (1000 * 60 * 60 * 24),
+              )
+            : undefined,
           inventoryLogInfo: {
             id: inventoryLogInfo?._id,
             status: inventoryLogInfo?.status,
@@ -874,11 +898,11 @@ export class InventoryLogsService {
     totalStock: number;
     batches: Array<{
       itemId: string;
-      batchNumber: string;
+      batchNumber: string | undefined;
       stock: number;
-      expiryDate: Date;
-      price: number;
-      daysUntilExpiry: number;
+      expiryDate: Date | undefined;
+      price: number | undefined;
+      daysUntilExpiry: number | undefined;
     }>;
   }> {
     try {
@@ -898,10 +922,12 @@ export class InventoryLogsService {
         stock: batch.stock,
         expiryDate: batch.expiryDate,
         price: batch.price,
-        daysUntilExpiry: Math.ceil(
-          (batch.expiryDate.getTime() - currentDate.getTime()) /
-            (1000 * 60 * 60 * 24),
-        ),
+        daysUntilExpiry: batch.expiryDate
+          ? Math.ceil(
+              (batch.expiryDate.getTime() - currentDate.getTime()) /
+                (1000 * 60 * 60 * 24),
+            )
+          : undefined,
         inventoryLogInfo: batch.inventoryLogId,
       }));
 
@@ -928,7 +954,7 @@ export class InventoryLogsService {
   ): Promise<{
     success: boolean;
     reducedBatches: Array<{
-      batchNumber: string;
+      batchNumber: string | undefined;
       reducedQuantity: number;
       remainingInBatch: number;
     }>;
@@ -946,7 +972,7 @@ export class InventoryLogsService {
 
       let remainingQuantity = quantityToReduce;
       const reducedBatches: Array<{
-        batchNumber: string;
+        batchNumber: string | undefined;
         reducedQuantity: number;
         remainingInBatch: number;
       }> = [];
