@@ -62,9 +62,6 @@ export class InventoryLogsService {
       // Format: PREFIX-YYYYMMDD-XXX
       const batchNumber = `${todayPrefix}-${sequence.toString().padStart(3, '0')}`;
 
-      this.logger.debug(
-        `Generated batch number: ${batchNumber} for product ${productId}`,
-      );
       return batchNumber;
     } catch (error) {
       this.logger.error(`Error generating batch number: ${error.message}`);
@@ -216,7 +213,7 @@ export class InventoryLogsService {
             productId: new Types.ObjectId(product.productId),
             quantity: product.quantity,
             batch: batchNumber,
-            stock: product.quantity,
+            stock: 0,
           };
 
           if (createInventoryLogDto.action === 'import') {
@@ -414,16 +411,12 @@ export class InventoryLogsService {
 
         const quantity = item.quantity;
 
-        this.logger.debug(
-          `Processing ${action} for product ID: ${productId} with quantity: ${quantity}`,
-        );
-
         try {
           if (action === 'import') {
             await this.inventoryLogItemsModel.findByIdAndUpdate(item._id, {
-              stock: quantity, 
+              stock: quantity,
             });
-            
+
             await this.syncProductStock(productId);
           } else if (action === 'export') {
             if (item.batch && item.batch.trim() !== '') {
@@ -848,7 +841,7 @@ export class InventoryLogsService {
       ]);
 
       const totalStock = batchStockTotal[0]?.totalStock || 0;
-
+      
       await this.productsService.update(productId, { stock: totalStock });
 
       this.logger.debug(
