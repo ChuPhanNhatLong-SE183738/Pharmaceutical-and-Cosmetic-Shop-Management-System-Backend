@@ -13,7 +13,11 @@ export class ProductsService {
   ) {}
 
   async create(createProductDto: CreateProductDto): Promise<ProductDocument> {
-    const newProduct = new this.productModel(createProductDto);
+    const productData = {
+      ...createProductDto,
+      stock: createProductDto.stock ?? 0,
+    };
+    const newProduct = new this.productModel(productData);
     return newProduct.save();
   }
 
@@ -182,5 +186,3 @@ export class ProductsService {
     );
   }
 }
-
-

@@ -11,6 +11,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { SuitableForType } from '../schemas/product.schema';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateProductDto {
   @IsNotEmpty()
@@ -26,10 +27,18 @@ export class CreateProductDto {
   @Min(0)
   price: number;
 
-  @IsNotEmpty()
+  @ApiProperty({
+    description:
+      'Initial stock quantity - Optional, defaults to 0. Stock should be managed through inventory import operations.',
+    example: 0,
+    minimum: 0,
+    required: false,
+    default: 0,
+  })
+  @IsOptional()
   @IsNumber()
   @Min(0)
-  stock: number;
+  stock?: number;
 
   @IsArray()
   @IsString({ each: true })

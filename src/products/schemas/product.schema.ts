@@ -28,8 +28,7 @@ export class Product {
   @Prop()
   productDescription: string;
 
-  @IsNotEmpty()
-  @Prop({ required: true })
+  @Prop({ required: true, default: 0, min: 0 })
   stock: number;
 
   @IsNotEmpty()
