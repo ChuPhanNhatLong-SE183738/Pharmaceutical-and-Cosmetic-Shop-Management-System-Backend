@@ -420,6 +420,10 @@ export class InventoryLogsService {
 
         try {
           if (action === 'import') {
+            await this.inventoryLogItemsModel.findByIdAndUpdate(item._id, {
+              stock: quantity, 
+            });
+            
             await this.syncProductStock(productId);
           } else if (action === 'export') {
             if (item.batch && item.batch.trim() !== '') {
