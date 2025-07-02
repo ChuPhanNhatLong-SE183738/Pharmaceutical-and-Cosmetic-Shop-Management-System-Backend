@@ -87,6 +87,7 @@ ProductSchema.pre('save', function(next) {
 
 ProductSchema.path('category').validate(function(value) {
   if (this.$locals.skipCategoryValidation) {
+    return true; 
   }
   return Array.isArray(value) && value.length > 0;
 });

@@ -107,12 +107,19 @@ export class ProductsService {
     id: string,
     updateProductDto: UpdateProductDto,
   ): Promise<ProductDocument> {
+    const isStockOnlyUpdate =
+      Object.keys(updateProductDto).length === 1 && 'stock' in updateProductDto;
+
     const updatedProduct = await this.productModel
-      .findByIdAndUpdate(id, updateProductDto, { new: true })
+      .findByIdAndUpdate(id, updateProductDto, {
+        new: true,
+        runValidators: !isStockOnlyUpdate,
+      })
       .exec();
     if (!updatedProduct) {
       throw new NotFoundException(`Product with ID ${id} not found`);
     }
+
     return updatedProduct;
   }
 
