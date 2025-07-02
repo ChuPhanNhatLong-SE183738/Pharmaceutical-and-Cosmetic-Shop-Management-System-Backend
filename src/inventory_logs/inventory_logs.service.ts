@@ -120,6 +120,7 @@ export class InventoryLogsService {
           );
         }
       } else {
+        // For FIFO exports (no specific batch), check total available stock
         const pipeline = [
           {
             $match: {
@@ -136,6 +137,9 @@ export class InventoryLogsService {
             },
           },
           {
+            $unwind: '$inventoryLog',
+          },
+          {
             $match: {
               'inventoryLog.status': 'completed',
               'inventoryLog.action': 'import',
@@ -149,9 +153,9 @@ export class InventoryLogsService {
           },
         ];
 
-        const totalStock =
+        const totalStockResult =
           await this.inventoryLogItemsModel.aggregate(pipeline);
-        const availableStock = totalStock[0]?.totalStock || 0;
+        const availableStock = totalStockResult[0]?.totalStock || 0;
 
         if (availableStock < product.quantity) {
           throw new BadRequestException(
@@ -168,10 +172,6 @@ export class InventoryLogsService {
     try {
       for (const product of createInventoryLogDto.products) {
         await this.productsService.findOne(product.productId);
-      }
-
-      if (createInventoryLogDto.action === 'export') {
-        await this.validateExportBatches(createInventoryLogDto.products);
       }
 
       if (createInventoryLogDto.action === 'export') {
