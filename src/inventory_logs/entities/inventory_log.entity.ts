@@ -16,13 +16,20 @@ export class InventoryLogItems {
   @IsNotEmpty()
   quantity: number;
 
-  @Prop({ required: true })
-  @IsNotEmpty()
-  expiryDate: Date;
+  @Prop({ required: false })
+  @IsOptional()
+  expiryDate?: Date;
 
-  @Prop({ required: true })
-  @IsNotEmpty()
-  price: number;
+  @Prop({ required: false })
+  @IsOptional()
+  price?: number;
+
+  @Prop({ required: false })
+  @IsOptional()
+  batch?: string;
+
+  @Prop({ required: true, min: 0 })
+  stock: number;
 }
 
 export type InventoryLogItemsDocument = InventoryLogItems & Document;
@@ -31,10 +38,6 @@ export const InventoryLogItemsSchema =
 
 @Schema({ timestamps: true })
 export class InventoryLog {
-  @Prop({ required: true })
-  @IsNotEmpty()
-  batch: string;
-
   @Prop({ required: true, enum: ['import', 'export'] })
   @IsNotEmpty()
   action: string;

@@ -6,12 +6,11 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose'; // Updated import to include Types
+import { Model, Types } from 'mongoose';
 import { User, UserDocument } from './entities/user.entity';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 

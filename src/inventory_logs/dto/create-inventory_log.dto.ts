@@ -13,6 +13,13 @@ import {
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
+/**
+ * InventoryLogItemDto represents a single product item in an inventory operation.
+ *
+ * Field Requirements:
+ * - IMPORTS: productId, quantity, expiryDate, and price are REQUIRED. batch is optional (auto-generated if not provided).
+ * - EXPORTS: Only productId and quantity are REQUIRED. batch is optional (uses FIFO if not specified). expiryDate and price are ignored.
+ */
 export class InventoryLogItemDto {
   @ApiProperty({
     description: 'Product ID (MongoDB ObjectId)',
@@ -33,36 +40,42 @@ export class InventoryLogItemDto {
   quantity: number;
 
   @ApiProperty({
-    description: 'Expiry date of the product (ISO format)',
+    description:
+      'Expiry date of the product (ISO format) - Required only for imports, ignored for exports',
     example: '2025-12-31T23:59:59.000Z',
+    required: false,
   })
-  @IsNotEmpty()
+  @IsOptional()
   @IsDateString()
-  expiryDate: string;
+  expiryDate?: string;
 
   @ApiProperty({
-    description: 'Import price of the product at the time of inventory',
+    description:
+      'Price of the product - Required for imports (import cost), ignored for exports',
     example: 25.99,
     minimum: 0,
+    required: false,
   })
-  @IsNotEmpty()
+  @IsOptional()
   @IsNumber()
   @Min(0)
-  price: number;
+  price?: number;
+
+  @ApiProperty({
+    description:
+      'Batch number - Optional for imports (will be auto-generated if not provided), Optional for exports (specific batch selection, uses FIFO if not specified)',
+    example: 'SKINCARE-2025-001',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  batch?: string;
 }
 
 export class CreateInventoryLogDto {
   @ApiProperty({
-    description: 'Batch identifier for the inventory operation',
-    example: 'BATCH-2025-001',
-  })
-  @IsNotEmpty()
-  @IsString()
-  batch: string;
-
-  @ApiProperty({
     description:
-      'List of products with quantities and expiry dates for this inventory operation',
+      'List of products for this inventory operation. For IMPORTS: expiryDate and price are required, batch is optional (auto-generated if not provided). For EXPORTS: only productId and quantity are required, batch is optional (uses FIFO if not specified).',
     type: [InventoryLogItemDto],
     example: [
       {
@@ -76,6 +89,7 @@ export class CreateInventoryLogDto {
         quantity: 25,
         expiryDate: '2026-01-15T23:59:59.000Z',
         price: 15.5,
+        batch: 'MAKEUP-2025-045',
       },
     ],
   })

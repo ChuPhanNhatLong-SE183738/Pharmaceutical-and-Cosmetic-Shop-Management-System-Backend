@@ -28,8 +28,7 @@ export class Product {
   @Prop()
   productDescription: string;
 
-  @IsNotEmpty()
-  @Prop({ required: true })
+  @Prop({ required: true, default: 0, min: 0 })
   stock: number;
 
   @IsNotEmpty()
@@ -88,6 +87,7 @@ ProductSchema.pre('save', function(next) {
 
 ProductSchema.path('category').validate(function(value) {
   if (this.$locals.skipCategoryValidation) {
+    return true; 
   }
   return Array.isArray(value) && value.length > 0;
 });

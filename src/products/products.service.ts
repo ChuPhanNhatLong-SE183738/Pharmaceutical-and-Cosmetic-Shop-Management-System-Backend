@@ -13,7 +13,11 @@ export class ProductsService {
   ) {}
 
   async create(createProductDto: CreateProductDto): Promise<ProductDocument> {
-    const newProduct = new this.productModel(createProductDto);
+    const productData = {
+      ...createProductDto,
+      stock: createProductDto.stock ?? 0,
+    };
+    const newProduct = new this.productModel(productData);
     return newProduct.save();
   }
 
@@ -103,13 +107,25 @@ export class ProductsService {
     id: string,
     updateProductDto: UpdateProductDto,
   ): Promise<ProductDocument> {
-    const updatedProduct = await this.productModel
-      .findByIdAndUpdate(id, updateProductDto, { new: true })
-      .exec();
-    if (!updatedProduct) {
-      throw new NotFoundException(`Product with ID ${id} not found`);
+    const isStockOnlyUpdate =
+      Object.keys(updateProductDto).length === 1 && 'stock' in updateProductDto;
+
+    try {
+      const updatedProduct = await this.productModel
+        .findByIdAndUpdate(id, updateProductDto, {
+          new: true,
+          runValidators: !isStockOnlyUpdate,
+        })
+        .exec();
+      
+      if (!updatedProduct) {
+        throw new NotFoundException(`Product with ID ${id} not found`);
+      }
+
+      return updatedProduct;
+    } catch (error) {
+      throw error;
     }
-    return updatedProduct;
   }
 
   async remove(id: string): Promise<void> {
@@ -182,5 +198,3 @@ export class ProductsService {
     );
   }
 }
-
-
