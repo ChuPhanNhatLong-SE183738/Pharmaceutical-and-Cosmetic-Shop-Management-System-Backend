@@ -80,13 +80,16 @@ const ProductSchema = SchemaFactory.createForClass(Product);
 
 ProductSchema.pre('save', function(next) {
   if (this.isModified('stock') && !this.isModified('category')) {
+    if (!this.$locals) {
+      this.$locals = {};
+    }
     this.$locals.skipCategoryValidation = true;
   }
   next();
 });
 
 ProductSchema.path('category').validate(function(value) {
-  if (this.$locals.skipCategoryValidation) {
+  if (this.$locals && this.$locals.skipCategoryValidation) {
     return true; 
   }
   return Array.isArray(value) && value.length > 0;
