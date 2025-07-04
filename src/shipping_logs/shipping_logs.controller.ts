@@ -223,7 +223,17 @@ export class ShippingLogsController {
     return successResponse(formattedLog, 'Shipping log retrieved successfully');
   }
 
+  @Get(':userId/shipping-log')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  async findShippingLogByUserId(@Param('userId') userId: string) {
+    const shippingLog =
+      await this.shippingLogsService.findShippingLogByUserId(userId);
+    return successResponse(shippingLog, 'Retrieved successfully!');
+  }
+
   @Get(':id')
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   async findOne(@Param('id') id: string) {
     this.logger.log(`Retrieving shipping log with ID: ${id}`);

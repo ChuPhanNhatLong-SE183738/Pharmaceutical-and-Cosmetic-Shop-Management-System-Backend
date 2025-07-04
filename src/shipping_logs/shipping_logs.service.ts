@@ -220,6 +220,24 @@ export class ShippingLogsService {
     }
   }
 
+  async findShippingLogByUserId(userId: string): Promise<any> {
+    const orders = await this.ordersModel.find({
+      userId: new Types.ObjectId(userId),
+    });
+
+    if (!orders || orders.length === 0) {
+      return [];
+    }
+
+    const orderIds = orders.map((order) => order._id);
+
+    const shippingLogs = await this.shippingLogModel.find({
+      orderId: { $in: orderIds },
+    });
+
+    return shippingLogs;
+  }
+
   async update(
     id: number,
     updateShippingLogDto: UpdateShippingLogDto,
