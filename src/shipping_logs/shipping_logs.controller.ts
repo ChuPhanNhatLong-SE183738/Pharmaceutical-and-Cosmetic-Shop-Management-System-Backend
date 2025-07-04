@@ -224,7 +224,7 @@ export class ShippingLogsController {
     return successResponse(formattedLog, 'Shipping log retrieved successfully');
   }
 
-  @Get(':userId/shipping-log')
+  @Get('/user')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   async findShippingLogByUserId(@Req() req) {
