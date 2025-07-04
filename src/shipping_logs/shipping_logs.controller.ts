@@ -11,6 +11,7 @@ import {
   ParseIntPipe,
   Request,
   HttpStatus,
+  Req,
 } from '@nestjs/common';
 import { ShippingLogsService } from './shipping_logs.service';
 import { CreateShippingLogDto } from './dto/create-shipping-log.dto';
@@ -226,7 +227,8 @@ export class ShippingLogsController {
   @Get(':userId/shipping-log')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  async findShippingLogByUserId(@Param('userId') userId: string) {
+  async findShippingLogByUserId(@Req() req) {
+    const userId = req.user.userId || req.user._id || req.user.sub;
     const shippingLog =
       await this.shippingLogsService.findShippingLogByUserId(userId);
     return successResponse(shippingLog, 'Retrieved successfully!');
