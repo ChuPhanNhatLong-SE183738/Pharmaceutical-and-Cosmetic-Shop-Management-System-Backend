@@ -18,8 +18,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../users/enums/role.enum';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
+import * as multer from 'multer';
 import { AnalyseService } from './analyse.service';
 import { CreateAnalyseDto, UploadAnalyseDto } from './dto/create-analyse.dto';
 import { UpdateAnalyseDto } from './dto/update-analyse.dto';
@@ -53,15 +52,7 @@ export class AnalyseController {
   })
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: './uploads/skin-analysis',
-        filename: (req, file, callback) => {
-          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-          const ext = extname(file.originalname);
-          const filename = `${uniqueSuffix}${ext}`;
-          callback(null, filename);
-        },
-      }),
+      storage: multer.memoryStorage(), // Use memory storage instead of disk
       fileFilter: (req, file, callback) => {
         if (!file.originalname.match(/\.(jpg|jpeg|png|webp)$/i)) {
           return callback(new Error('Only image files are allowed!'), false);
@@ -85,11 +76,11 @@ export class AnalyseController {
 
       const userId = req.user.userId || req.user._id || req.user.sub;
       
-      // Use Firebase URL for storing, file buffer for analysis
+      // Use file buffer directly for analysis (no file system operations)
       const result = await this.analyseService.processAndSaveAnalysis(
-        file.buffer || await require('fs').promises.readFile(file.path),
+        file.buffer, // Direct buffer access
         userId,
-        body.firebaseUrl // Use Firebase URL instead of local URL
+        body.firebaseUrl // Use Firebase URL for storage
       );
       
       return successResponse(result, 'Skin analysis completed successfully');
