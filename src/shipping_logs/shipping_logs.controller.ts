@@ -49,7 +49,7 @@ export class ShippingLogsController {
   }
 
   @Get()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   async findAll(@Request() req) {
     this.logger.log(`Retrieving all shipping logs by user: ${req.user.userId}`);
 
