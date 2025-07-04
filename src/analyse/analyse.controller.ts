@@ -21,7 +21,7 @@ import { Role } from '../users/enums/role.enum';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { AnalyseService } from './analyse.service';
-import { CreateAnalyseDto } from './dto/create-analyse.dto';
+import { CreateAnalyseDto, UploadAnalyseDto } from './dto/create-analyse.dto';
 import { UpdateAnalyseDto } from './dto/update-analyse.dto';
 import { successResponse, errorResponse } from '../helper/response.helper';
 import { ApiTags, ApiConsumes, ApiBody } from '@nestjs/swagger';
@@ -43,6 +43,10 @@ export class AnalyseController {
         file: {
           type: 'string',
           format: 'binary',
+        },
+        firebaseUrl: {
+          type: 'string',
+          description: 'Firebase storage URL for the uploaded image',
         },
       },
     },
@@ -69,20 +73,23 @@ export class AnalyseController {
       },
     }),
   )
-  async uploadAndAnalyze(@UploadedFile() file, @Req() req) {
+  async uploadAndAnalyze(@UploadedFile() file, @Body() body: UploadAnalyseDto, @Req() req) {
     try {
       if (!file) {
         return errorResponse('No image file provided', HttpStatus.BAD_REQUEST);
       }
 
+      if (!body.firebaseUrl) {
+        return errorResponse('Firebase URL is required', HttpStatus.BAD_REQUEST);
+      }
+
       const userId = req.user.userId || req.user._id || req.user.sub;
       
-      const imageUrl = `${req.protocol}://${req.get('host')}/uploads/skin-analysis/${file.filename}`;
-      
+      // Use Firebase URL for storing, file buffer for analysis
       const result = await this.analyseService.processAndSaveAnalysis(
         file.buffer || await require('fs').promises.readFile(file.path),
         userId,
-        imageUrl
+        body.firebaseUrl // Use Firebase URL instead of local URL
       );
       
       return successResponse(result, 'Skin analysis completed successfully');

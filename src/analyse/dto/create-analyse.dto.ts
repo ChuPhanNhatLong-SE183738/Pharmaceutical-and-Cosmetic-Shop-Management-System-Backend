@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsArray, ValidateNested, IsOptional, IsMongoId } from 'class-validator';
+import { IsString, IsNotEmpty, IsArray, ValidateNested, IsOptional, IsMongoId, IsUrl } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class RecommendationDto {
@@ -33,4 +33,11 @@ export class CreateAnalyseDto {
   @ValidateNested({ each: true })
   @Type(() => RecommendationDto)
   recommendedProducts?: RecommendationDto[];
+}
+
+// New DTO for upload with Firebase URL
+export class UploadAnalyseDto {
+  @IsUrl()
+  @IsNotEmpty()
+  firebaseUrl: string;
 }
