@@ -478,6 +478,3 @@ export class EmailService {
     `;
   }
 }
-    `;
-  }
-}
