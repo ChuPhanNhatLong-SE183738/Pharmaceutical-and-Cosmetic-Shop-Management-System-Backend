@@ -21,11 +21,13 @@ import { Product, ProductDocument } from '../products/schemas/product.schema';
 import { User } from '../users/entities/user.entity';
 import { Transaction } from '../transactions/entities/transaction.entity';
 import { ShippingLogsService } from '../shipping_logs/shipping_logs.service';
+import { InventoryLogsService } from '../inventory_logs/inventory_logs.service';
 
 @Injectable()
 export class OrdersService {
   private readonly logger = new Logger(OrdersService.name);
   private shippingLogsService: ShippingLogsService;
+  private inventoryLogsService: InventoryLogsService;
 
   constructor(
     @InjectModel(Orders.name) private ordersModel: Model<OrdersDocument>,
@@ -36,9 +38,11 @@ export class OrdersService {
     private readonly usersService: UsersService,
     private readonly moduleRef: ModuleRef,
   ) {
-    // We'll resolve the ShippingLogsService after initialization to avoid circular dependencies
     setTimeout(() => {
       this.shippingLogsService = this.moduleRef.get(ShippingLogsService, {
+        strict: false,
+      });
+      this.inventoryLogsService = this.moduleRef.get(InventoryLogsService, {
         strict: false,
       });
     }, 0);
@@ -330,7 +334,56 @@ export class OrdersService {
             `Failed to create shipping log: ${error.message}`,
             error.stack,
           );
-          // Continue execution even if shipping log creation fails
+        }
+
+        try {
+          if (!this.inventoryLogsService) {
+            this.inventoryLogsService = this.moduleRef.get(InventoryLogsService, {
+              strict: false,
+            });
+          }
+
+          const orderItems = await this.orderItemsModel
+            .find({ orderId: new Types.ObjectId(id) })
+            .exec();
+
+          this.logger.debug(`Found ${orderItems.length} items in order ${id} to reduce stock for`);
+
+          for (const item of orderItems) {
+            try {
+              const productId = item.productId.toString();
+              const quantity = item.quantity;
+
+              this.logger.debug(`Reducing stock for product ${productId} by ${quantity} units`);
+
+              const reductionResult = await this.inventoryLogsService.reduceStockFIFO(
+                productId,
+                quantity,
+              );
+
+              if (reductionResult.success) {
+                this.logger.log(
+                  `Successfully reduced stock for product ${productId} by ${reductionResult.totalReduced} units`,
+                );
+              } else {
+                this.logger.warn(
+                  `Partial stock reduction for product ${productId}: reduced ${reductionResult.totalReduced}/${quantity}, shortfall: ${reductionResult.shortfall}`,
+                );
+              }
+            } catch (stockError) {
+              this.logger.error(
+                `Failed to reduce stock for item ${item._id}: ${stockError.message}`,
+                stockError.stack,
+              );
+            }
+          }
+
+          this.logger.log(`Stock reduction completed for order ${id}`);
+        } catch (error) {
+          this.logger.error(
+            `Failed to reduce stock for order ${id}: ${error.message}`,
+            error.stack,
+          );
         }
       }
 
