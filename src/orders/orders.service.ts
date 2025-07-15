@@ -27,7 +27,6 @@ import { InventoryLogsService } from '../inventory_logs/inventory_logs.service';
 export class OrdersService {
   private readonly logger = new Logger(OrdersService.name);
   private shippingLogsService: ShippingLogsService;
-  private inventoryLogsService: InventoryLogsService;
 
   constructor(
     @InjectModel(Orders.name) private ordersModel: Model<OrdersDocument>,
@@ -36,13 +35,11 @@ export class OrdersService {
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
     private readonly cartService: CartService,
     private readonly usersService: UsersService,
+    private readonly inventoryLogsService: InventoryLogsService,
     private readonly moduleRef: ModuleRef,
   ) {
     setTimeout(() => {
       this.shippingLogsService = this.moduleRef.get(ShippingLogsService, {
-        strict: false,
-      });
-      this.inventoryLogsService = this.moduleRef.get(InventoryLogsService, {
         strict: false,
       });
     }, 0);
@@ -336,13 +333,8 @@ export class OrdersService {
           );
         }
 
+        // Reduce stock for each order item
         try {
-          if (!this.inventoryLogsService) {
-            this.inventoryLogsService = this.moduleRef.get(InventoryLogsService, {
-              strict: false,
-            });
-          }
-
           const orderItems = await this.orderItemsModel
             .find({ orderId: new Types.ObjectId(id) })
             .exec();

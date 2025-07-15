@@ -18,6 +18,7 @@ import {
   TransactionSchema,
 } from '../transactions/entities/transaction.entity';
 import { ShippingLogsModule } from '../shipping_logs/shipping_logs.module';
+import { InventoryLogsModule } from '../inventory_logs/inventory_logs.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { ShippingLogsModule } from '../shipping_logs/shipping_logs.module';
     UsersModule,
     TransactionsModule,
     ShippingLogsModule,
+    InventoryLogsModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],
