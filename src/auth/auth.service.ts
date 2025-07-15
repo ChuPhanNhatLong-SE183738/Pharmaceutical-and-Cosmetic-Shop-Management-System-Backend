@@ -374,4 +374,35 @@ export class AuthService {
     await user.save();
     return { message: 'Password reset successfully' };
   }
+
+  async changePassword(
+    userId: string,
+    oldPassword: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
+    const user = await this.usersService.findById(userId);
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    if(oldPassword === newPassword) {
+      throw new BadRequestException('New password must be different from old password');
+    }
+
+    const isPasswordValid = await this.usersService.validatePassword(
+      oldPassword,
+      user.password,
+    );
+
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Old password is incorrect');
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+
+    return { message: 'Password changed successfully' };
+  }
 }

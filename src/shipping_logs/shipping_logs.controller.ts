@@ -11,6 +11,7 @@ import {
   ParseIntPipe,
   Request,
   HttpStatus,
+  Req,
 } from '@nestjs/common';
 import { ShippingLogsService } from './shipping_logs.service';
 import { CreateShippingLogDto } from './dto/create-shipping-log.dto';
@@ -49,7 +50,7 @@ export class ShippingLogsController {
   }
 
   @Get()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   async findAll(@Request() req) {
     this.logger.log(`Retrieving all shipping logs by user: ${req.user.userId}`);
 
@@ -223,7 +224,18 @@ export class ShippingLogsController {
     return successResponse(formattedLog, 'Shipping log retrieved successfully');
   }
 
+  @Get('/user')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  async findShippingLogByUserId(@Req() req) {
+    const userId = req.user.userId || req.user._id || req.user.sub;
+    const shippingLog =
+      await this.shippingLogsService.findShippingLogByUserId(userId);
+    return successResponse(shippingLog, 'Retrieved successfully!');
+  }
+
   @Get(':id')
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   async findOne(@Param('id') id: string) {
     this.logger.log(`Retrieving shipping log with ID: ${id}`);

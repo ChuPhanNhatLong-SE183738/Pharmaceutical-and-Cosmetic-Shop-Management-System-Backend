@@ -1,118 +1,25 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private transporter: nodemailer.Transporter;
+  private resend: Resend;
+  private fromEmail: string;
 
   constructor(private configService: ConfigService) {
-    this.setupEmailProvider();
-  }
-
-  private setupEmailProvider() {
-    const emailService = this.configService.get('EMAIL_SERVICE', 'gmail');
-    const emailUsername = this.configService.get('EMAIL_USERNAME');
-    const emailPassword = this.configService.get('EMAIL_PASSWORD');
-
-    this.logger.log(`📧 Setting up email service: ${emailService}`);
-    this.logger.log(`📧 Email username: ${emailUsername}`);
-    this.logger.log(`🔑 Password length: ${emailPassword?.length} characters`);
-
-    switch (emailService.toLowerCase()) {
-      case 'outlook':
-      case 'hotmail':
-        this.setupOutlook(emailUsername, emailPassword);
-        break;
-      case 'yahoo':
-        this.setupYahoo(emailUsername, emailPassword);
-        break;
-      case 'ethereal':
-        this.setupEthereal(emailUsername, emailPassword);
-        break;
-      case 'gmail':
-      default:
-        this.setupGmail(emailUsername, emailPassword);
-        break;
+    const apiKey = this.configService.get<string>('RESEND_API_KEY');
+    const fromEmail = this.configService.get<string>('RESEND_FROM_EMAIL');
+    if (!apiKey || !fromEmail) {
+      this.logger.error(
+        '❌ RESEND_API_KEY or RESEND_FROM_EMAIL is missing in environment variables',
+      );
+      throw new Error('Resend API key or from email missing');
     }
-  }
-
-  private setupOutlook(username: string, password: string) {
-    this.transporter = nodemailer.createTransport({
-      service: 'hotmail', // Works for both outlook.com and hotmail.com
-      auth: {
-        user: username,
-        pass: password,
-      },
-    });
-    this.verifyConnection('Outlook');
-  }
-
-  private setupYahoo(username: string, password: string) {
-    this.transporter = nodemailer.createTransport({
-      service: 'yahoo',
-      auth: {
-        user: username,
-        pass: password, // Use App Password for Yahoo
-      },
-    });
-    this.verifyConnection('Yahoo');
-  }
-
-  private setupEthereal(username: string, password: string) {
-    this.transporter = nodemailer.createTransport({
-      host: 'smtp.ethereal.email',
-      port: 587,
-      secure: false,
-      auth: {
-        user: username,
-        pass: password,
-      },
-    });
-    this.verifyConnection('Ethereal (Test)');
-  }
-
-  private setupGmail(username: string, password: string) {
-    this.transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: username,
-        pass: password, // Use App Password for Gmail
-      },
-    });
-    this.verifyConnection('Gmail');
-  }
-
-  private verifyConnection(serviceName: string) {
-    this.transporter.verify((error, success) => {
-      if (error) {
-        this.logger.error(
-          `❌ ${serviceName} SMTP connection failed:`,
-          error.message,
-        );
-        this.logger.warn('💡 Troubleshooting tips:');
-        if (serviceName === 'Gmail') {
-          this.logger.warn(
-            '   - Gmail: Generate App Password at https://myaccount.google.com/apppasswords',
-          );
-          this.logger.warn('   - Gmail: Login to Gmail in browser first');
-        } else if (serviceName === 'Outlook') {
-          this.logger.warn(
-            '   - Outlook: Use regular password (no App Password needed)',
-          );
-          this.logger.warn('   - Outlook: Make sure account is active');
-        } else if (serviceName === 'Yahoo') {
-          this.logger.warn(
-            '   - Yahoo: Generate App Password in Account Settings',
-          );
-        }
-      } else {
-        this.logger.log(
-          `✅ ${serviceName} SMTP connection verified successfully`,
-        );
-      }
-    });
+    this.fromEmail = fromEmail;
+    this.resend = new Resend(apiKey);
+    this.logger.log('✅ Resend email service initialized');
   }
 
   async sendVerificationEmail(email: string, token: string): Promise<void> {
@@ -134,17 +41,38 @@ export class EmailService {
     };
 
     try {
-      const info = await this.transporter.sendMail(mailOptions);
+      await this.sendEmail(mailOptions.to, mailOptions.subject, mailOptions.html, mailOptions.text);
       this.logger.log(`✅ Verification email sent to: ${email}`);
-      this.logger.log(`🔗 Verification URL: ${verificationUrl}`);
-      this.logger.log(`📧 Message ID: ${info.messageId}`);
-
-      // Log preview URL for Ethereal
-      if (info.getTestMessageUrl) {
-        this.logger.log(`👀 Preview email: ${info.getTestMessageUrl(info)}`);
-      }
     } catch (error) {
       this.logger.error('❌ Failed to send verification email:', error.message);
+      throw error;
+    }
+  }
+
+  private async sendEmail(
+    to: string,
+    subject: string,
+    html: string,
+    text: string,
+  ) {
+    try {
+      const result = await this.resend.emails.send({
+        from: this.fromEmail,
+        to,
+        subject,
+        html,
+        text,
+      });
+      if (result.error) {
+        this.logger.error(
+          `❌ Failed to send email to ${to}:`,
+          result.error.message,
+        );
+        throw new Error(result.error.message);
+      }
+      this.logger.log(`✅ Email sent to: ${to}`);
+    } catch (error) {
+      this.logger.error(`❌ Failed to send email to ${to}:`, error.message);
       throw error;
     }
   }
@@ -153,7 +81,7 @@ export class EmailService {
     const mailOptions = {
       from: {
         name: 'Trung tâm chăm sóc da',
-        address: this.configService.get('EMAIL_USERNAME'),
+        address: this.fromEmail,
       },
       to: email,
       subject: '🎉 Chào mừng đến với Trung tâm chăm sóc da!',
@@ -162,9 +90,8 @@ export class EmailService {
     };
 
     try {
-      const info = await this.transporter.sendMail(mailOptions);
+      await this.sendEmail(mailOptions.to, mailOptions.subject, mailOptions.html, mailOptions.text);
       this.logger.log(`✅ Welcome email sent to: ${email}`);
-      this.logger.log(`📧 Message ID: ${info.messageId}`);
     } catch (error) {
       this.logger.error('❌ Failed to send welcome email:', error.message);
       throw error;
@@ -181,7 +108,7 @@ export class EmailService {
     const mailOptions = {
       from: {
         name: 'Trung tâm chăm sóc da',
-        address: this.configService.get('EMAIL_USERNAME'),
+        address: this.fromEmail,
       },
       to: email,
       subject: '🔑 Đặt lại mật khẩu - Trung tâm chăm sóc da',
@@ -190,10 +117,9 @@ export class EmailService {
     };
 
     try {
-      const info = await this.transporter.sendMail(mailOptions);
+      await this.sendEmail(mailOptions.to, mailOptions.subject, mailOptions.html, mailOptions.text);
       this.logger.log(`✅ Forgot password email sent to: ${email}`);
       this.logger.log(`🔗 Reset URL: ${resetUrl}`);
-      this.logger.log(`📧 Message ID: ${info.messageId}`);
     } catch (error) {
       this.logger.error(
         '❌ Failed to send forgot password email:',
@@ -207,7 +133,7 @@ export class EmailService {
     const mailOptions = {
       from: {
         name: 'Trung tâm chăm sóc da',
-        address: this.configService.get('EMAIL_USERNAME'),
+        address: this.fromEmail,
       },
       to: email,
       subject: '🔑 Mã xác thực đặt lại mật khẩu (OTP) - Trung tâm chăm sóc da',
@@ -215,9 +141,8 @@ export class EmailService {
       text: `Mã OTP đặt lại mật khẩu của bạn là: ${otp}`,
     };
     try {
-      const info = await this.transporter.sendMail(mailOptions);
+      await this.sendEmail(mailOptions.to, mailOptions.subject, mailOptions.html, mailOptions.text);
       this.logger.log(`✅ Forgot password OTP email sent to: ${email}`);
-      this.logger.log(`📧 Message ID: ${info.messageId}`);
     } catch (error) {
       this.logger.error(
         '❌ Failed to send forgot password OTP email:',

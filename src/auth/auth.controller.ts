@@ -8,6 +8,7 @@ import {
   HttpStatus,
   Get,
   Logger,
+  Patch,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
@@ -22,6 +23,7 @@ import {
 import { LoginUserDto } from 'src/users/dto/login-user.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { successResponse, errorResponse } from '../helper/response.helper';
+import { ApiBody } from '@nestjs/swagger';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -115,6 +117,29 @@ export class AuthController {
     @Body('isMobile') isMobile: boolean = false,
   ) {
     return this.authService.sendForgotPasswordEmail(email, isMobile);
+  }
+  @Patch('change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Change user password' })
+  @ApiResponse({ status: 200, description: 'Password changed successfully' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        currentPassword: { type: 'string', example: 'oldPassword123' },
+        newPassword: { type: 'string', example: 'newPassword456' },
+      },
+      required: ['currentPassword', 'newPassword'],
+    },
+  })
+  async changePassword(
+    @Request() req,
+    @Body('currentPassword') currentPassword: string,
+    @Body('newPassword') newPassword: string,
+  ) {
+    const userId = req.user.sub || req.user.id;
+    return this.authService.changePassword(userId, currentPassword, newPassword);
   }
 
   // Đặt lại mật khẩu qua token (web)
