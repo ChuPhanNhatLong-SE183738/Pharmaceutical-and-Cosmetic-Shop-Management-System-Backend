@@ -69,7 +69,6 @@ export class OrdersController {
     try {
       const userId = req.user.sub || req.user.id;
 
-      console.log(`Fetching orders for user ID: ${userId}`);
       const orders = await this.ordersService.findOrdersByUserId(userId);
       return successResponse(orders, 'Orders for user retrieved successfully');
     } catch (error) {
