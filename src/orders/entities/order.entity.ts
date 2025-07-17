@@ -25,6 +25,24 @@ export class Order_Items {
 
   @Prop()
   productImage: string;
+
+  // Batch tracking information
+  @Prop([{
+    batchNumber: { type: String },
+    reducedQuantity: { type: Number, required: true },
+    remainingInBatch: { type: Number, required: true }
+  }])
+  batchReductions: Array<{
+    batchNumber: string;
+    reducedQuantity: number;
+    remainingInBatch: number;
+  }>;
+
+  @Prop({ default: false })
+  stockReduced: boolean;
+
+  @Prop()
+  stockReductionMethod: string; // 'FIFO' or 'DIRECT'
 }
 
 export const Order_ItemsSchema = SchemaFactory.createForClass(Order_Items);

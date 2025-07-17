@@ -212,4 +212,21 @@ export class OrdersController {
       return errorResponse(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'staff')
+  @Get(':id/batch-details')
+  @ApiOperation({ summary: 'Get batch reduction details for an order' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns detailed information about which batches were used for stock reduction',
+  })
+  async getOrderBatchDetails(@Param('id') id: string) {
+    try {
+      const batchDetails = await this.ordersService.getOrderBatchDetails(id);
+      return successResponse(batchDetails, 'Order batch details retrieved successfully');
+    } catch (error) {
+      return errorResponse(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
 }

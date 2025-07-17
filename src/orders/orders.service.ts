@@ -373,6 +373,17 @@ export class OrdersService {
                     const newStock = product.stock - quantity;
                     await this.productModel.findByIdAndUpdate(productId, { stock: newStock });
                     this.logger.debug(`Directly reduced product stock from ${product.stock} to ${newStock}`);
+                    
+                    // Update order item with fallback reduction info
+                    await this.orderItemsModel.findByIdAndUpdate(item._id, {
+                      stockReduced: true,
+                      stockReductionMethod: 'DIRECT',
+                      batchReductions: [{
+                        batchNumber: 'DIRECT-FALLBACK',
+                        reducedQuantity: quantity,
+                        remainingInBatch: newStock
+                      }]
+                    });
                   } else {
                     this.logger.error(`Product ${productId} has insufficient stock (${product.stock}) for quantity ${quantity}`);
                   }
@@ -391,6 +402,13 @@ export class OrdersService {
                     `Successfully reduced stock for product ${productId} by ${reductionResult.totalReduced} units`,
                   );
                   
+                  // Update order item with batch reduction details
+                  await this.orderItemsModel.findByIdAndUpdate(item._id, {
+                    stockReduced: true,
+                    stockReductionMethod: 'FIFO',
+                    batchReductions: reductionResult.reducedBatches
+                  });
+                  
                   // Check product stock after reduction
                   const updatedProduct = await this.productModel.findById(productId);
                   if (updatedProduct) {
@@ -400,6 +418,13 @@ export class OrdersService {
                   this.logger.debug(
                     `Partial stock reduction for product ${productId}: reduced ${reductionResult.totalReduced}/${quantity}, shortfall: ${reductionResult.shortfall}`,
                   );
+                  
+                  // Update order item with partial reduction details
+                  await this.orderItemsModel.findByIdAndUpdate(item._id, {
+                    stockReduced: reductionResult.totalReduced > 0,
+                    stockReductionMethod: 'FIFO',
+                    batchReductions: reductionResult.reducedBatches
+                  });
                 }
               } catch (stockError) {
                 this.logger.error(
@@ -466,6 +491,9 @@ export class OrdersService {
           productName: item.productName,
           productImage: item.productImage,
           subtotal: item.price * item.quantity,
+          stockReduced: item.stockReduced || false,
+          stockReductionMethod: item.stockReductionMethod || null,
+          batchReductions: item.batchReductions || [],
         })),
         itemCount: orderItems.length,
         totalQuantity: orderItems.reduce((sum, item) => sum + item.quantity, 0),
@@ -531,6 +559,17 @@ export class OrdersService {
                     const newStock = product.stock - quantity;
                     await this.productModel.findByIdAndUpdate(productId, { stock: newStock });
                     this.logger.debug(`FALLBACK: Directly reduced product stock from ${product.stock} to ${newStock}`);
+                    
+                    // Update order item with fallback reduction info
+                    await this.orderItemsModel.findByIdAndUpdate(item._id, {
+                      stockReduced: true,
+                      stockReductionMethod: 'DIRECT',
+                      batchReductions: [{
+                        batchNumber: 'DIRECT-FALLBACK',
+                        reducedQuantity: quantity,
+                        remainingInBatch: newStock
+                      }]
+                    });
                   } else {
                     this.logger.error(`FALLBACK FAILED: Product ${productId} has insufficient stock (${product.stock}) for quantity ${quantity}`);
                   }
@@ -549,6 +588,13 @@ export class OrdersService {
                     `Successfully reduced stock for product ${productId} by ${reductionResult.totalReduced} units`,
                   );
                   
+                  // Update order item with batch reduction details
+                  await this.orderItemsModel.findByIdAndUpdate(item._id, {
+                    stockReduced: true,
+                    stockReductionMethod: 'FIFO',
+                    batchReductions: reductionResult.reducedBatches
+                  });
+                  
                   // Check product stock after reduction
                   const updatedProduct = await this.productModel.findById(productId);
                   if (updatedProduct) {
@@ -558,6 +604,13 @@ export class OrdersService {
                   this.logger.debug(
                     `Partial stock reduction for product ${productId}: reduced ${reductionResult.totalReduced}/${quantity}, shortfall: ${reductionResult.shortfall}`,
                   );
+                  
+                  // Update order item with partial reduction details
+                  await this.orderItemsModel.findByIdAndUpdate(item._id, {
+                    stockReduced: reductionResult.totalReduced > 0,
+                    stockReductionMethod: 'FIFO',
+                    batchReductions: reductionResult.reducedBatches
+                  });
                 }
               } catch (stockError) {
                 this.logger.error(
@@ -954,6 +1007,47 @@ export class OrdersService {
     } catch (error) {
       this.logger.error(
         `Error calculating revenue from orders: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  async getOrderBatchDetails(orderId: string) {
+    try {
+      const orderItems = await this.orderItemsModel
+        .find({ orderId: new Types.ObjectId(orderId) })
+        .populate('productId', 'productName')
+        .exec();
+
+      const batchDetails = orderItems.map((item) => ({
+        productId: item.productId._id,
+        productName: item.productName,
+        quantity: item.quantity,
+        stockReduced: item.stockReduced,
+        stockReductionMethod: item.stockReductionMethod,
+        batchReductions: item.batchReductions || [],
+        totalReducedFromBatches: (item.batchReductions || []).reduce(
+          (sum, batch) => sum + batch.reducedQuantity,
+          0
+        ),
+      }));
+
+      return {
+        orderId,
+        items: batchDetails,
+        summary: {
+          totalItems: batchDetails.length,
+          totalBatchesUsed: batchDetails.reduce(
+            (sum, item) => sum + (item.batchReductions?.length || 0),
+            0
+          ),
+          allStockReduced: batchDetails.every(item => item.stockReduced),
+        }
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error getting batch details for order ${orderId}: ${error.message}`,
         error.stack,
       );
       throw error;
