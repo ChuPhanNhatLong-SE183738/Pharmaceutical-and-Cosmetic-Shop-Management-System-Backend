@@ -21,6 +21,7 @@ import { Product, ProductDocument } from '../products/schemas/product.schema';
 import { User } from '../users/entities/user.entity';
 import { Transaction } from '../transactions/entities/transaction.entity';
 import { ShippingLogsService } from '../shipping_logs/shipping_logs.service';
+import { InventoryLogsService } from '../inventory_logs/inventory_logs.service';
 
 @Injectable()
 export class OrdersService {
@@ -34,9 +35,9 @@ export class OrdersService {
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
     private readonly cartService: CartService,
     private readonly usersService: UsersService,
+    private readonly inventoryLogsService: InventoryLogsService,
     private readonly moduleRef: ModuleRef,
   ) {
-    // We'll resolve the ShippingLogsService after initialization to avoid circular dependencies
     setTimeout(() => {
       this.shippingLogsService = this.moduleRef.get(ShippingLogsService, {
         strict: false,
@@ -278,6 +279,8 @@ export class OrdersService {
     },
   ) {
     try {
+      this.logger.log(`Processing order ${id} with status: ${data.status}`);
+      
       const order = await this.ordersModel.findById(id);
       if (!order) {
         throw new NotFoundException(`Order with ID ${id} not found`);
@@ -330,7 +333,114 @@ export class OrdersService {
             `Failed to create shipping log: ${error.message}`,
             error.stack,
           );
-          // Continue execution even if shipping log creation fails
+        }
+
+        // Reduce stock for each order item
+        try {
+          this.logger.log(`Starting stock reduction for order ${id}`);
+          
+          const orderItems = await this.orderItemsModel
+            .find({ orderId: new Types.ObjectId(id) })
+            .exec();
+
+          this.logger.log(`Found ${orderItems.length} items in order ${id} to reduce stock for`);
+
+          if (orderItems.length === 0) {
+            this.logger.warn(`No order items found for order ${id}`);
+          } else {
+            for (const item of orderItems) {
+              try {
+                const productId = item.productId.toString();
+                const quantity = item.quantity;
+
+                this.logger.debug(`Reducing stock for product ${productId} by ${quantity} units`);
+
+                // Check current product stock before reduction
+                const product = await this.productModel.findById(productId);
+                if (!product) {
+                  this.logger.error(`Product ${productId} not found`);
+                  continue;
+                }
+
+                // Check if there are any inventory batches for this product
+                const inventoryBatches = await this.inventoryLogsService.getAvailableBatchesCount(productId);
+
+                if (inventoryBatches === 0) {
+                  this.logger.debug(`No inventory batches found for product ${productId}, using fallback stock reduction`);
+                  
+                  // Fallback: Directly reduce the product stock
+                  if (product.stock >= quantity) {
+                    const newStock = product.stock - quantity;
+                    await this.productModel.findByIdAndUpdate(productId, { stock: newStock });
+                    this.logger.debug(`Directly reduced product stock from ${product.stock} to ${newStock}`);
+                    
+                    // Update order item with fallback reduction info
+                    await this.orderItemsModel.findByIdAndUpdate(item._id, {
+                      stockReduced: true,
+                      stockReductionMethod: 'DIRECT',
+                      batchReductions: [{
+                        batchNumber: 'DIRECT-FALLBACK',
+                        reducedQuantity: quantity,
+                        remainingInBatch: newStock
+                      }]
+                    });
+                  } else {
+                    this.logger.error(`Product ${productId} has insufficient stock (${product.stock}) for quantity ${quantity}`);
+                  }
+                  continue;
+                }
+
+                const reductionResult = await this.inventoryLogsService.reduceStockFIFO(
+                  productId,
+                  quantity,
+                );
+
+                this.logger.debug(`Stock reduction result:`, JSON.stringify(reductionResult, null, 2));
+
+                if (reductionResult.success) {
+                  this.logger.debug(
+                    `Successfully reduced stock for product ${productId} by ${reductionResult.totalReduced} units`,
+                  );
+                  
+                  // Update order item with batch reduction details
+                  await this.orderItemsModel.findByIdAndUpdate(item._id, {
+                    stockReduced: true,
+                    stockReductionMethod: 'FIFO',
+                    batchReductions: reductionResult.reducedBatches
+                  });
+                  
+                  // Check product stock after reduction
+                  const updatedProduct = await this.productModel.findById(productId);
+                  if (updatedProduct) {
+                    this.logger.debug(`Updated product stock after reduction: ${updatedProduct.stock}`);
+                  }
+                } else {
+                  this.logger.debug(
+                    `Partial stock reduction for product ${productId}: reduced ${reductionResult.totalReduced}/${quantity}, shortfall: ${reductionResult.shortfall}`,
+                  );
+                  
+                  // Update order item with partial reduction details
+                  await this.orderItemsModel.findByIdAndUpdate(item._id, {
+                    stockReduced: reductionResult.totalReduced > 0,
+                    stockReductionMethod: 'FIFO',
+                    batchReductions: reductionResult.reducedBatches
+                  });
+                }
+              } catch (stockError) {
+                this.logger.error(
+                  `Failed to reduce stock for item ${item._id}: ${stockError.message}`,
+                  stockError.stack,
+                );
+              }
+            }
+
+            this.logger.debug(`Stock reduction completed for order ${id}`);
+          }
+        } catch (error) {
+          this.logger.error(
+            `Failed to reduce stock for order ${id}: ${error.message}`,
+            error.stack,
+          );
         }
       }
 
@@ -381,6 +491,9 @@ export class OrdersService {
           productName: item.productName,
           productImage: item.productImage,
           subtotal: item.price * item.quantity,
+          stockReduced: item.stockReduced || false,
+          stockReductionMethod: item.stockReductionMethod || null,
+          batchReductions: item.batchReductions || [],
         })),
         itemCount: orderItems.length,
         totalQuantity: orderItems.reduce((sum, item) => sum + item.quantity, 0),
@@ -402,6 +515,120 @@ export class OrdersService {
 
       order.status = status;
       await order.save();
+
+      // Add stock reduction logic when status is approved
+      if (status === 'approved') {
+        try {
+          this.logger.log(`Starting stock reduction for order ${id}`);
+          
+          const orderItems = await this.orderItemsModel
+            .find({ orderId: new Types.ObjectId(id) })
+            .exec();
+
+          this.logger.log(`Found ${orderItems.length} items in order ${id} to reduce stock for`);
+
+          if (orderItems.length === 0) {
+            this.logger.warn(`No order items found for order ${id}`);
+          } else {
+            for (const item of orderItems) {
+              try {
+                const productId = item.productId.toString();
+                const quantity = item.quantity;
+
+                this.logger.debug(`REDUCING STOCK: Product ${productId} by ${quantity} units`);
+
+                // Check current product stock before reduction
+                const product = await this.productModel.findById(productId);
+                if (product) {
+                  this.logger.debug(`Current product stock before reduction: ${product.stock}`);
+                } else {
+                  this.logger.error(`Product ${productId} not found!`);
+                  continue;
+                }
+
+                // Check if there are any inventory batches for this product
+                const inventoryBatches = await this.inventoryLogsService.getAvailableBatchesCount(productId);
+
+                this.logger.debug(`Found ${inventoryBatches} inventory batches with stock for product ${productId}`);
+
+                if (inventoryBatches === 0) {
+                  this.logger.debug(`No inventory batches found for product ${productId}. This product may not have been properly added to inventory through the inventory management system.`);
+                  
+                  // Fallback: Directly reduce the product stock
+                  if (product.stock >= quantity) {
+                    const newStock = product.stock - quantity;
+                    await this.productModel.findByIdAndUpdate(productId, { stock: newStock });
+                    this.logger.debug(`FALLBACK: Directly reduced product stock from ${product.stock} to ${newStock}`);
+                    
+                    // Update order item with fallback reduction info
+                    await this.orderItemsModel.findByIdAndUpdate(item._id, {
+                      stockReduced: true,
+                      stockReductionMethod: 'DIRECT',
+                      batchReductions: [{
+                        batchNumber: 'DIRECT-FALLBACK',
+                        reducedQuantity: quantity,
+                        remainingInBatch: newStock
+                      }]
+                    });
+                  } else {
+                    this.logger.error(`FALLBACK FAILED: Product ${productId} has insufficient stock (${product.stock}) for quantity ${quantity}`);
+                  }
+                  continue;
+                }
+
+                const reductionResult = await this.inventoryLogsService.reduceStockFIFO(
+                  productId,
+                  quantity,
+                );
+
+                this.logger.debug(`Stock reduction result:`, JSON.stringify(reductionResult, null, 2));
+
+                if (reductionResult.success) {
+                  this.logger.debug(
+                    `Successfully reduced stock for product ${productId} by ${reductionResult.totalReduced} units`,
+                  );
+                  
+                  // Update order item with batch reduction details
+                  await this.orderItemsModel.findByIdAndUpdate(item._id, {
+                    stockReduced: true,
+                    stockReductionMethod: 'FIFO',
+                    batchReductions: reductionResult.reducedBatches
+                  });
+                  
+                  // Check product stock after reduction
+                  const updatedProduct = await this.productModel.findById(productId);
+                  if (updatedProduct) {
+                    this.logger.debug(`Updated product stock after reduction: ${updatedProduct.stock}`);
+                  }
+                } else {
+                  this.logger.debug(
+                    `Partial stock reduction for product ${productId}: reduced ${reductionResult.totalReduced}/${quantity}, shortfall: ${reductionResult.shortfall}`,
+                  );
+                  
+                  // Update order item with partial reduction details
+                  await this.orderItemsModel.findByIdAndUpdate(item._id, {
+                    stockReduced: reductionResult.totalReduced > 0,
+                    stockReductionMethod: 'FIFO',
+                    batchReductions: reductionResult.reducedBatches
+                  });
+                }
+              } catch (stockError) {
+                this.logger.error(
+                  `Failed to reduce stock for item ${item._id}: ${stockError.message}`,
+                  stockError.stack,
+                );
+              }
+            }
+
+            this.logger.debug(`Stock reduction completed for order ${id}`);
+          }
+        } catch (error) {
+          this.logger.error(
+            `Failed to reduce stock for order ${id}: ${error.message}`,
+            error.stack,
+          );
+        }
+      }
 
       return this.findOne(id);
     } catch (error) {
@@ -780,6 +1007,47 @@ export class OrdersService {
     } catch (error) {
       this.logger.error(
         `Error calculating revenue from orders: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  async getOrderBatchDetails(orderId: string) {
+    try {
+      const orderItems = await this.orderItemsModel
+        .find({ orderId: new Types.ObjectId(orderId) })
+        .populate('productId', 'productName')
+        .exec();
+
+      const batchDetails = orderItems.map((item) => ({
+        productId: item.productId._id,
+        productName: item.productName,
+        quantity: item.quantity,
+        stockReduced: item.stockReduced,
+        stockReductionMethod: item.stockReductionMethod,
+        batchReductions: item.batchReductions || [],
+        totalReducedFromBatches: (item.batchReductions || []).reduce(
+          (sum, batch) => sum + batch.reducedQuantity,
+          0
+        ),
+      }));
+
+      return {
+        orderId,
+        items: batchDetails,
+        summary: {
+          totalItems: batchDetails.length,
+          totalBatchesUsed: batchDetails.reduce(
+            (sum, item) => sum + (item.batchReductions?.length || 0),
+            0
+          ),
+          allStockReduced: batchDetails.every(item => item.stockReduced),
+        }
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error getting batch details for order ${orderId}: ${error.message}`,
         error.stack,
       );
       throw error;

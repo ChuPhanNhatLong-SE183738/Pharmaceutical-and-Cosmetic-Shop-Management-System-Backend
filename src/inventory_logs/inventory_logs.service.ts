@@ -1062,4 +1062,20 @@ export class InventoryLogsService {
       throw error;
     }
   }
+
+  async getAvailableBatchesCount(productId: string): Promise<number> {
+    try {
+      return await this.inventoryLogItemsModel
+        .find({
+          productId: new Types.ObjectId(productId),
+          stock: { $gt: 0 },
+        })
+        .countDocuments();
+    } catch (error) {
+      this.logger.error(
+        `Error checking available batches for product ${productId}: ${error.message}`,
+      );
+      return 0;
+    }
+  }
 }
