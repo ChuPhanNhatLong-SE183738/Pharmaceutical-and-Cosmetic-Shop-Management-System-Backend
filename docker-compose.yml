@@ -6,7 +6,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=4090
-      - MONGODB_URI=mongodb://mongo:27017/pharmaceutical_shop
+      - MONGODB_URI=${DB_CONNECTION_LINK:-mongodb://mongo:27017/pharmaceutical_shop}
       - JWT_SECRET=${JWT_SECRET}
       - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
       - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
