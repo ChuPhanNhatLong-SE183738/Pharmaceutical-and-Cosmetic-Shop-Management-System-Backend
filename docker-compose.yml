@@ -29,7 +29,7 @@ services:
     image: mongo:6
     container_name: pharmaceutical_shop_mongo
     ports:
-      - '27018:27017' # Sử dụng port khác để tránh conflict
+      - '27019:27017' # Sử dụng port khác để tránh conflict
     environment:
       - MONGO_INITDB_DATABASE=pharmaceutical_shop
     volumes:
