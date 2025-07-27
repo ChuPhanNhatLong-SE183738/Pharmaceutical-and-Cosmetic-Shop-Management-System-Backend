@@ -181,6 +181,7 @@ export class AuthService {
         fullName: userObject.fullName,
         role: userObject.role,
         photoUrl: userObject.photoUrl || null,
+        isVerified: userObject.isVerified,
         phone: userObject.phone || null,
         address: userObject.address || null,
         dob: userObject.dob || null,
@@ -386,8 +387,10 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    if(oldPassword === newPassword) {
-      throw new BadRequestException('New password must be different from old password');
+    if (oldPassword === newPassword) {
+      throw new BadRequestException(
+        'New password must be different from old password',
+      );
     }
 
     const isPasswordValid = await this.usersService.validatePassword(
