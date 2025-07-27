@@ -66,9 +66,8 @@ COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/package*.json ./
 
-# Copy data model if exists
-RUN mkdir -p data_model
-COPY --from=builder --chown=nestjs:nodejs /app/src/data_model ./data_model 2>/dev/null || true
+# Copy data model (make sure src/data_model exists in your project)
+COPY --from=builder --chown=nestjs:nodejs /app/src/data_model ./data_model
 
 # Create uploads directory with proper permissions
 RUN mkdir -p uploads/chat uploads/skin-analysis && chown -R nestjs:nodejs uploads
