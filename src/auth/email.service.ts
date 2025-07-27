@@ -25,7 +25,7 @@ export class EmailService {
   async sendVerificationEmail(email: string, token: string): Promise<void> {
     const frontendUrl = this.configService.get(
       'FRONTEND_URL',
-      'http://localhost:3000',
+      'https://pharmaceutical-and-cosmetic-shop-ma-lemon.vercel.app',
     );
     const verificationUrl = `${frontendUrl}/verify-email?token=${token}`;
 
@@ -41,7 +41,12 @@ export class EmailService {
     };
 
     try {
-      await this.sendEmail(mailOptions.to, mailOptions.subject, mailOptions.html, mailOptions.text);
+      await this.sendEmail(
+        mailOptions.to,
+        mailOptions.subject,
+        mailOptions.html,
+        mailOptions.text,
+      );
       this.logger.log(`✅ Verification email sent to: ${email}`);
     } catch (error) {
       this.logger.error('❌ Failed to send verification email:', error.message);
@@ -90,7 +95,12 @@ export class EmailService {
     };
 
     try {
-      await this.sendEmail(mailOptions.to, mailOptions.subject, mailOptions.html, mailOptions.text);
+      await this.sendEmail(
+        mailOptions.to,
+        mailOptions.subject,
+        mailOptions.html,
+        mailOptions.text,
+      );
       this.logger.log(`✅ Welcome email sent to: ${email}`);
     } catch (error) {
       this.logger.error('❌ Failed to send welcome email:', error.message);
@@ -101,7 +111,7 @@ export class EmailService {
   async sendForgotPasswordEmail(email: string, token: string): Promise<void> {
     const frontendUrl = this.configService.get(
       'FRONTEND_URL',
-      'http://localhost:3000',
+      'https://pharmaceutical-and-cosmetic-shop-ma-lemon.vercel.app',
     );
     const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
 
@@ -117,7 +127,12 @@ export class EmailService {
     };
 
     try {
-      await this.sendEmail(mailOptions.to, mailOptions.subject, mailOptions.html, mailOptions.text);
+      await this.sendEmail(
+        mailOptions.to,
+        mailOptions.subject,
+        mailOptions.html,
+        mailOptions.text,
+      );
       this.logger.log(`✅ Forgot password email sent to: ${email}`);
       this.logger.log(`🔗 Reset URL: ${resetUrl}`);
     } catch (error) {
@@ -141,7 +156,12 @@ export class EmailService {
       text: `Mã OTP đặt lại mật khẩu của bạn là: ${otp}`,
     };
     try {
-      await this.sendEmail(mailOptions.to, mailOptions.subject, mailOptions.html, mailOptions.text);
+      await this.sendEmail(
+        mailOptions.to,
+        mailOptions.subject,
+        mailOptions.html,
+        mailOptions.text,
+      );
       this.logger.log(`✅ Forgot password OTP email sent to: ${email}`);
     } catch (error) {
       this.logger.error(
@@ -161,7 +181,7 @@ export class EmailService {
     // Can be used for debugging or testing purposes
     const frontendUrl = this.configService.get(
       'FRONTEND_URL',
-      'http://localhost:3000',
+      'https://pharmaceutical-and-cosmetic-shop-ma-lemon.vercel.app',
     );
     const verificationUrl = `${frontendUrl}/verify-email?token=${token}`;
     const htmlContent = this.createVerificationEmailTemplate(verificationUrl);
@@ -335,7 +355,7 @@ export class EmailService {
             
             <!-- CTA Button -->
             <div style="text-align: center; margin: 40px 0;">
-                <a href="${this.configService.get('FRONTEND_URL', 'https://skinora.vercel.app')}" 
+                <a href="${this.configService.get('FRONTEND_URL', 'https://pharmaceutical-and-cosmetic-shop-ma-lemon.vercel.app')}" 
                    style="display: inline-block; padding: 18px 45px; background: linear-gradient(135deg, #2ECC71 0%, #27AE60 100%); color: white; text-decoration: none; border-radius: 50px; font-weight: bold; font-size: 16px; box-shadow: 0 6px 20px rgba(46, 204, 113, 0.4);">
                     🚀 Bắt Đầu Ngay
                 </a>

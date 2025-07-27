@@ -285,7 +285,8 @@ export class PaymentsService {
       vnp_TxnRef: orderReference,
       vnp_OrderInfo: orderInfo,
       vnp_OrderType: ProductCode.Other,
-      vnp_ReturnUrl: 'http://localhost:4000/payment-result',
+      vnp_ReturnUrl:
+        'https://pharmaceutical-and-cosmetic-shop-ma-lemon.vercel.app/payment-result',
       vnp_Locale: VnpLocale.VN,
       vnp_CreateDate: dateFormat(new Date()),
       vnp_ExpireDate: dateFormat(tomorrow),
