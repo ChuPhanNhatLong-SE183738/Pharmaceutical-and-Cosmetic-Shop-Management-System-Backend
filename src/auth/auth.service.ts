@@ -181,7 +181,7 @@ export class AuthService {
         fullName: userObject.fullName,
         role: userObject.role,
         photoUrl: userObject.photoUrl || null,
-        isVerified: userObject.isVerified,
+        isVerified: userObject.isVerified || false,
         phone: userObject.phone || null,
         address: userObject.address || null,
         dob: userObject.dob || null,
